@@ -9,13 +9,13 @@
 | # | Question | Type |
 |---|----------|------|
 | 1 | Overall, how satisfied are you working in this department? | Rating 1–5 (required) |
-| 2 | What is one thing the department is doing well that you'd like to see more of? | Open text |
-| 3 | What is something the department does that we could do less of? | Open text |
-| 4 | What gets in the way of you being as productive as possible? | Open text |
-| 5 | Do you feel you have the support you need to succeed in your role? + What would make you feel more supported and valued? | Rating 1–5 (required) + open text |
-| 6 | What one change would make the biggest difference in building a stronger, more accountable team? | Open text |
-| 7 | How can leadership better support you? | Open text |
-| – | Anything else you'd like to share? | Open text |
+| 2 | What is one thing the department is doing well that you'd like to see more of? | Open text (required) |
+| 3 | What is something the department does that we could do less of? | Open text (required) |
+| 4 | What gets in the way of you being as productive as possible? | Open text (required) |
+| 5 | Do you feel you have the support you need to succeed in your role? + What would make you feel more supported and valued? | Rating 1–5 + open text (both required) |
+| 6 | What one change would make the biggest difference in building a stronger, more accountable team? | Open text (required) |
+| 7 | How can leadership better support you? | Open text (required) |
+| – | Anything else you'd like to share? | Open text (optional extra) |
 
 ## How it works
 
