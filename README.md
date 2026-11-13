@@ -6,16 +6,20 @@
 
 ## What it asks
 
-| # | Question | Type |
-|---|----------|------|
-| 1 | Overall, how satisfied are you working in this department? | Rating 1–5 (required) |
-| 2 | What is one thing the department is doing well that you'd like to see more of? | Open text (required) |
-| 3 | What is something the department does that we could do less of? | Open text (required) |
-| 4 | What gets in the way of you being as productive as possible? | Open text (required) |
-| 5 | Do you feel you have the support you need to succeed in your role? + What would make you feel more supported and valued? | Rating 1–5 + open text (both required) |
-| 6 | What one change would make the biggest difference in building a stronger, more accountable team? | Open text (required) |
-| 7 | How can leadership better support you? | Open text (required) |
-| – | Anything else you'd like to share? | Open text (optional extra) |
+Six required 1–5 ratings (1 = Very dissatisfied, 5 = Very satisfied), each with an optional comment, plus two optional open-ended questions.
+
+| # | Area | Rating question (required) | Follow-up (optional) |
+|---|------|----------------------------|----------------------|
+| 1 | Overall satisfaction | Overall, how satisfied are you with your experience working for the company? | What contributes most to your satisfaction? |
+| 2 | Leadership | How satisfied are you with your department's communication and leadership? | What could be improved? |
+| 3 | Team effectiveness | How satisfied are you with the level of teamwork and accountability in your department? | What would make your team stronger? |
+| 4 | Resources & support | How satisfied are you with the resources and support you need to be productive and effective in your position? | What would help you be more successful? |
+| 5 | Recognition | How satisfied are you with the recognition and appreciation you receive? | How could we show more appreciation? |
+| 6 | Employee voice | How satisfied are you with the opportunities to share your ideas and concerns with leadership? | What would encourage more open communication? |
+| 7 | Open-ended (optional) | What is one thing we do well that you would like to see continue? | |
+| 8 | Open-ended (optional) | What is one thing we could change to make this a better place to work? | |
+
+Questions cover four focus areas: **People** (management, leadership, teamwork, accountability), **Processes** (inefficiencies, unnecessary steps, communication breakdowns), **Resources** (staffing, training, technology, workload), and **Culture** (recognition, appreciation, trust, employee involvement). The ratings give a quantitative baseline to compare against future surveys.
 
 ## How it works
 
@@ -38,17 +42,16 @@ index.html  ──POST JSON──▶  Power Automate (HTTP trigger)  ──▶  
 
 ```json
 {
-  "surveyId": "how-are-we-doing",
-  "submittedAt": "2026-11-03T15:00:00.000Z",
-  "satisfaction": 4,
-  "doingWell": "",
-  "doLess": "",
-  "blockers": "",
-  "supportRating": 3,
-  "supportedValued": "",
-  "biggestChange": "",
-  "leadership": "",
-  "anythingElse": ""
+  "surveyId": "how-are-we-doing-v2",
+  "submittedAt": "2026-11-13T15:00:00.000Z",
+  "overallRating": 4,      "overallComment": "",
+  "leadershipRating": 4,   "leadershipComment": "",
+  "teamworkRating": 4,     "teamworkComment": "",
+  "resourcesRating": 4,    "resourcesComment": "",
+  "recognitionRating": 4,  "recognitionComment": "",
+  "voiceRating": 4,        "voiceComment": "",
+  "continueDoing": "",
+  "oneChange": ""
 }
 ```
 

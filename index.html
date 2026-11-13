@@ -40,7 +40,9 @@
   main{max-width:760px;margin:0 auto;padding:36px 20px 80px}
   .hero{margin-bottom:28px}
   .hero h1{font-size:40px;line-height:1.1;color:var(--navy-deep);margin-bottom:10px}
-  .hero p{color:var(--muted);max-width:600px}
+  .hero p{color:var(--muted);max-width:640px;margin-bottom:10px}
+  .hero p.meta{font-size:13px;font-weight:600;color:var(--navy);letter-spacing:.02em}
+  .section-label{font:600 12px 'Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#25587e;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--line)}
   .notice{display:flex;gap:12px;align-items:flex-start;background:var(--navy-soft);border-left:4px solid var(--navy);padding:14px 16px;border-radius:8px;margin-top:18px;font-size:14px}
   .notice svg{flex:none;margin-top:2px}
 
@@ -75,7 +77,6 @@
   /* Extra optional question */
   .q.extra{background:#eef5fb;border:1px dashed #8fb3cc}
   .q.extra:focus-within{border-color:#3586c6}
-  .extra-tag{display:inline-block;font:600 11px 'Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#25587e;background:#d9e8f4;padding:4px 10px;border-radius:999px;margin-bottom:10px}
   .q.extra h2{color:#25587e}
   .q.extra textarea{background:#fff;border-color:#c5dbeb}
   .q.extra textarea:focus{border-color:#3586c6;box-shadow:0 0 0 3px rgba(53,134,198,.15)}
@@ -126,7 +127,9 @@
   <form id="survey" novalidate>
     <section class="hero">
       <h1>How are we doing?</h1>
-      <p>Your honest feedback helps us build a better department. This takes about 5 minutes. All questions are required except the last one.</p>
+      <p>The purpose of this survey is to better understand your experience working here, identify what we are doing well, and uncover opportunities to improve our workplace culture, communication, and overall effectiveness.</p>
+      <p>Your feedback is important and will help us identify ways to better support our employees, strengthen our teams, and create an environment where everyone can succeed. Please answer honestly and thoughtfully.</p>
+      <p class="meta">About 5 minutes &middot; All ratings are required &middot; Comments are optional</p>
       <div class="notice">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0b3550" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         <span><strong>This survey is anonymous.</strong> We do not collect your name, email, or any identifying information.</span>
@@ -134,92 +137,143 @@
     </section>
 
     <!-- 1 -->
-    <div class="q" data-required="satisfaction">
-      <div class="q-num">Question 1 of 7</div>
-      <h2><span>Overall, how satisfied are you working in this department?</span><span class="req">*</span></h2>
-      <p class="hint">1 = Not at all, 5 = Very</p>
+    <div class="q" data-required="overallRating">
+      <div class="q-num">Question 1 of 8 &middot; Overall satisfaction</div>
+      <h2><span>Overall, how satisfied are you with your experience working for the company?</span><span class="req">*</span></h2>
+      <p class="hint">1 = Very dissatisfied, 5 = Very satisfied</p>
       <div class="scale">
-        <input type="radio" name="satisfaction" id="s1" value="1"><label for="s1"><b>1</b></label>
-        <input type="radio" name="satisfaction" id="s2" value="2"><label for="s2"><b>2</b></label>
-        <input type="radio" name="satisfaction" id="s3" value="3"><label for="s3"><b>3</b></label>
-        <input type="radio" name="satisfaction" id="s4" value="4"><label for="s4"><b>4</b></label>
-        <input type="radio" name="satisfaction" id="s5" value="5"><label for="s5"><b>5</b></label>
+        <input type="radio" name="overallRating" id="overall1" value="1"><label for="overall1"><b>1</b></label>
+        <input type="radio" name="overallRating" id="overall2" value="2"><label for="overall2"><b>2</b></label>
+        <input type="radio" name="overallRating" id="overall3" value="3"><label for="overall3"><b>3</b></label>
+        <input type="radio" name="overallRating" id="overall4" value="4"><label for="overall4"><b>4</b></label>
+        <input type="radio" name="overallRating" id="overall5" value="5"><label for="overall5"><b>5</b></label>
       </div>
-      <div class="scale-ends"><span>Not satisfied</span><span>Very satisfied</span></div>
+      <div class="scale-ends"><span>Very dissatisfied</span><span>Very satisfied</span></div>
       <p class="err">Please select a rating.</p>
+      <div class="follow">
+        <p>What contributes most to your satisfaction? <span class="opt">Optional</span></p>
+        <textarea name="overallComment" maxlength="1500"></textarea>
+        <div class="count">0 / 1500</div>
+      </div>
     </div>
 
     <!-- 2 -->
-    <div class="q" data-required="doingWell">
-      <div class="q-num">Question 2 of 7</div>
-      <h2><span>What is one thing the department is doing well that you'd like to see more of?</span><span class="req">*</span></h2>
-      <textarea name="doingWell" maxlength="1500"></textarea>
-      <div class="count">0 / 1500</div>
-      <p class="err">Please answer this question.</p>
+    <div class="q" data-required="leadershipRating">
+      <div class="q-num">Question 2 of 8 &middot; Leadership</div>
+      <h2><span>How satisfied are you with your department's communication and leadership?</span><span class="req">*</span></h2>
+      <p class="hint">1 = Very dissatisfied, 5 = Very satisfied</p>
+      <div class="scale">
+        <input type="radio" name="leadershipRating" id="leadership1" value="1"><label for="leadership1"><b>1</b></label>
+        <input type="radio" name="leadershipRating" id="leadership2" value="2"><label for="leadership2"><b>2</b></label>
+        <input type="radio" name="leadershipRating" id="leadership3" value="3"><label for="leadership3"><b>3</b></label>
+        <input type="radio" name="leadershipRating" id="leadership4" value="4"><label for="leadership4"><b>4</b></label>
+        <input type="radio" name="leadershipRating" id="leadership5" value="5"><label for="leadership5"><b>5</b></label>
+      </div>
+      <div class="scale-ends"><span>Very dissatisfied</span><span>Very satisfied</span></div>
+      <p class="err">Please select a rating.</p>
+      <div class="follow">
+        <p>What could be improved? <span class="opt">Optional</span></p>
+        <textarea name="leadershipComment" maxlength="1500"></textarea>
+        <div class="count">0 / 1500</div>
+      </div>
     </div>
 
     <!-- 3 -->
-    <div class="q" data-required="doLess">
-      <div class="q-num">Question 3 of 7</div>
-      <h2><span>What is something the department does that we could do less of?</span><span class="req">*</span></h2>
-      <textarea name="doLess" maxlength="1500"></textarea>
-      <div class="count">0 / 1500</div>
-      <p class="err">Please answer this question.</p>
+    <div class="q" data-required="teamworkRating">
+      <div class="q-num">Question 3 of 8 &middot; Team effectiveness</div>
+      <h2><span>How satisfied are you with the level of teamwork and accountability in your department?</span><span class="req">*</span></h2>
+      <p class="hint">1 = Very dissatisfied, 5 = Very satisfied</p>
+      <div class="scale">
+        <input type="radio" name="teamworkRating" id="teamwork1" value="1"><label for="teamwork1"><b>1</b></label>
+        <input type="radio" name="teamworkRating" id="teamwork2" value="2"><label for="teamwork2"><b>2</b></label>
+        <input type="radio" name="teamworkRating" id="teamwork3" value="3"><label for="teamwork3"><b>3</b></label>
+        <input type="radio" name="teamworkRating" id="teamwork4" value="4"><label for="teamwork4"><b>4</b></label>
+        <input type="radio" name="teamworkRating" id="teamwork5" value="5"><label for="teamwork5"><b>5</b></label>
+      </div>
+      <div class="scale-ends"><span>Very dissatisfied</span><span>Very satisfied</span></div>
+      <p class="err">Please select a rating.</p>
+      <div class="follow">
+        <p>What would make your team stronger? <span class="opt">Optional</span></p>
+        <textarea name="teamworkComment" maxlength="1500"></textarea>
+        <div class="count">0 / 1500</div>
+      </div>
     </div>
 
     <!-- 4 -->
-    <div class="q" data-required="blockers">
-      <div class="q-num">Question 4 of 7</div>
-      <h2><span>What gets in the way of you being as productive as possible?</span><span class="req">*</span></h2>
-      <textarea name="blockers" maxlength="1500"></textarea>
-      <div class="count">0 / 1500</div>
-      <p class="err">Please answer this question.</p>
+    <div class="q" data-required="resourcesRating">
+      <div class="q-num">Question 4 of 8 &middot; Resources & support</div>
+      <h2><span>How satisfied are you with the resources and support you need to be productive and effective in your position?</span><span class="req">*</span></h2>
+      <p class="hint">1 = Very dissatisfied, 5 = Very satisfied</p>
+      <div class="scale">
+        <input type="radio" name="resourcesRating" id="resources1" value="1"><label for="resources1"><b>1</b></label>
+        <input type="radio" name="resourcesRating" id="resources2" value="2"><label for="resources2"><b>2</b></label>
+        <input type="radio" name="resourcesRating" id="resources3" value="3"><label for="resources3"><b>3</b></label>
+        <input type="radio" name="resourcesRating" id="resources4" value="4"><label for="resources4"><b>4</b></label>
+        <input type="radio" name="resourcesRating" id="resources5" value="5"><label for="resources5"><b>5</b></label>
+      </div>
+      <div class="scale-ends"><span>Very dissatisfied</span><span>Very satisfied</span></div>
+      <p class="err">Please select a rating.</p>
+      <div class="follow">
+        <p>What would help you be more successful? <span class="opt">Optional</span></p>
+        <textarea name="resourcesComment" maxlength="1500"></textarea>
+        <div class="count">0 / 1500</div>
+      </div>
     </div>
 
     <!-- 5 -->
-    <div class="q" data-required="supportRating supportedValued">
-      <div class="q-num">Question 5 of 7</div>
-      <h2><span>Do you feel you have the support you need to succeed in your role?</span><span class="req">*</span></h2>
-      <p class="hint">1 = Not at all, 5 = Very</p>
+    <div class="q" data-required="recognitionRating">
+      <div class="q-num">Question 5 of 8 &middot; Recognition</div>
+      <h2><span>How satisfied are you with the recognition and appreciation you receive?</span><span class="req">*</span></h2>
+      <p class="hint">1 = Very dissatisfied, 5 = Very satisfied</p>
       <div class="scale">
-        <input type="radio" name="supportRating" id="p1" value="1"><label for="p1"><b>1</b></label>
-        <input type="radio" name="supportRating" id="p2" value="2"><label for="p2"><b>2</b></label>
-        <input type="radio" name="supportRating" id="p3" value="3"><label for="p3"><b>3</b></label>
-        <input type="radio" name="supportRating" id="p4" value="4"><label for="p4"><b>4</b></label>
-        <input type="radio" name="supportRating" id="p5" value="5"><label for="p5"><b>5</b></label>
+        <input type="radio" name="recognitionRating" id="recognition1" value="1"><label for="recognition1"><b>1</b></label>
+        <input type="radio" name="recognitionRating" id="recognition2" value="2"><label for="recognition2"><b>2</b></label>
+        <input type="radio" name="recognitionRating" id="recognition3" value="3"><label for="recognition3"><b>3</b></label>
+        <input type="radio" name="recognitionRating" id="recognition4" value="4"><label for="recognition4"><b>4</b></label>
+        <input type="radio" name="recognitionRating" id="recognition5" value="5"><label for="recognition5"><b>5</b></label>
       </div>
-      <div class="scale-ends"><span>Not supported</span><span>Fully supported</span></div>
+      <div class="scale-ends"><span>Very dissatisfied</span><span>Very satisfied</span></div>
+      <p class="err">Please select a rating.</p>
       <div class="follow">
-        <p>What would make you feel more supported and valued?<span class="req">*</span></p>
-        <textarea name="supportedValued" maxlength="1500"></textarea>
+        <p>How could we show more appreciation? <span class="opt">Optional</span></p>
+        <textarea name="recognitionComment" maxlength="1500"></textarea>
         <div class="count">0 / 1500</div>
       </div>
-      <p class="err">Please choose a rating and answer the follow-up.</p>
     </div>
 
     <!-- 6 -->
-    <div class="q" data-required="biggestChange">
-      <div class="q-num">Question 6 of 7</div>
-      <h2><span>What one change would make the biggest difference in building a stronger, more accountable team?</span><span class="req">*</span></h2>
-      <textarea name="biggestChange" maxlength="1500"></textarea>
-      <div class="count">0 / 1500</div>
-      <p class="err">Please answer this question.</p>
+    <div class="q" data-required="voiceRating">
+      <div class="q-num">Question 6 of 8 &middot; Employee voice</div>
+      <h2><span>How satisfied are you with the opportunities to share your ideas and concerns with leadership?</span><span class="req">*</span></h2>
+      <p class="hint">1 = Very dissatisfied, 5 = Very satisfied</p>
+      <div class="scale">
+        <input type="radio" name="voiceRating" id="voice1" value="1"><label for="voice1"><b>1</b></label>
+        <input type="radio" name="voiceRating" id="voice2" value="2"><label for="voice2"><b>2</b></label>
+        <input type="radio" name="voiceRating" id="voice3" value="3"><label for="voice3"><b>3</b></label>
+        <input type="radio" name="voiceRating" id="voice4" value="4"><label for="voice4"><b>4</b></label>
+        <input type="radio" name="voiceRating" id="voice5" value="5"><label for="voice5"><b>5</b></label>
+      </div>
+      <div class="scale-ends"><span>Very dissatisfied</span><span>Very satisfied</span></div>
+      <p class="err">Please select a rating.</p>
+      <div class="follow">
+        <p>What would encourage more open communication? <span class="opt">Optional</span></p>
+        <textarea name="voiceComment" maxlength="1500"></textarea>
+        <div class="count">0 / 1500</div>
+      </div>
     </div>
 
-    <!-- 7 -->
-    <div class="q" data-required="leadership">
-      <div class="q-num">Question 7 of 7</div>
-      <h2><span>How can leadership better support you?</span><span class="req">*</span></h2>
-      <textarea name="leadership" maxlength="1500"></textarea>
-      <div class="count">0 / 1500</div>
-      <p class="err">Please answer this question.</p>
-    </div>
-
-    <!-- Extra (optional) -->
+    <!-- Open-ended (optional) -->
+    <div class="section-label">Open-ended &middot; Optional</div>
     <div class="q extra">
-      <div class="extra-tag">Extra · Optional</div>
-      <h2><span>Anything else you'd like to share?</span></h2>
-      <textarea name="anythingElse" maxlength="2000"></textarea>
+      <div class="q-num">Question 7 of 8</div>
+      <h2><span>What is one thing we do well that you would like to see continue?</span></h2>
+      <textarea name="continueDoing" maxlength="2000"></textarea>
+      <div class="count">0 / 2000</div>
+    </div>
+    <div class="q extra">
+      <div class="q-num">Question 8 of 8</div>
+      <h2><span>What is one thing we could change to make this a better place to work?</span></h2>
+      <textarea name="oneChange" maxlength="2000"></textarea>
       <div class="count">0 / 2000</div>
     </div>
 
@@ -246,7 +300,7 @@
 /* ============ CONFIG ============ */
 // Paste the HTTP POST URL from your Power Automate trigger "When an HTTP request is received"
 const FLOW_URL = "https://defaultcf5067efbe8e47daa8aa318f347fdb.22.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/14/workflows/b054bb44725d47a79209028727425a25/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=Di5GsFXqCkUQ_lRtH5k4jtVHdltUAK7fbN3MhaVpx8M";
-const SURVEY_ID = "how-are-we-doing";
+const SURVEY_ID = "how-are-we-doing-v2";
 
 
 /* ============ COUNTERS + PROGRESS ============ */
@@ -295,15 +349,20 @@ form.addEventListener("submit", async e=>{
   const payload = {
     surveyId: SURVEY_ID,
     submittedAt: new Date().toISOString(),
-    satisfaction: Number(val("satisfaction")),
-    doingWell: val("doingWell"),
-    doLess: val("doLess"),
-    blockers: val("blockers"),
-    supportRating: Number(val("supportRating")),
-    supportedValued: val("supportedValued"),
-    biggestChange: val("biggestChange"),
-    leadership: val("leadership"),
-    anythingElse: val("anythingElse")
+    overallRating: Number(val("overallRating")),
+    overallComment: val("overallComment"),
+    leadershipRating: Number(val("leadershipRating")),
+    leadershipComment: val("leadershipComment"),
+    teamworkRating: Number(val("teamworkRating")),
+    teamworkComment: val("teamworkComment"),
+    resourcesRating: Number(val("resourcesRating")),
+    resourcesComment: val("resourcesComment"),
+    recognitionRating: Number(val("recognitionRating")),
+    recognitionComment: val("recognitionComment"),
+    voiceRating: Number(val("voiceRating")),
+    voiceComment: val("voiceComment"),
+    continueDoing: val("continueDoing"),
+    oneChange: val("oneChange")
   };
 
   const btn = document.getElementById("submitBtn");
