@@ -1,4 +1,4 @@
-# SNAP Department Feedback & Improvement Survey
+# SNAP Feedback & Improvement Survey
 
 **How are we doing?** is an anonymous internal survey for SNAP Insurance Service, LLC. Employees share what is working, what is getting in the way, and how leadership can better support them.
 
@@ -10,14 +10,14 @@ Six required 1–5 ratings (1 = Very dissatisfied, 5 = Very satisfied), each wit
 
 | # | Area | Rating question (required) | Follow-up (optional) |
 |---|------|----------------------------|----------------------|
-| 1 | Overall satisfaction | Overall, how satisfied are you with your experience working for the company? | What contributes most to your satisfaction? |
+| 1 | Overall satisfaction | Overall, how satisfied are you with your experience working for Snap? | What contributes most to your satisfaction? |
 | 2 | Leadership | How satisfied are you with your department's communication and leadership? | What could be improved? |
 | 3 | Team effectiveness | How satisfied are you with the level of teamwork and accountability in your department? | What would make your team stronger? |
 | 4 | Resources & support | How satisfied are you with the resources and support you need to be productive and effective in your position? | What would help you be more successful? |
 | 5 | Recognition | How satisfied are you with the recognition and appreciation you receive? | How could we show more appreciation? |
 | 6 | Employee voice | How satisfied are you with the opportunities to share your ideas and concerns with leadership? | What would encourage more open communication? |
 | 7 | Open-ended (optional) | What is one thing we do well that you would like to see continue? | |
-| 8 | Open-ended (optional) | What is one thing we could change to make this a better place to work? | |
+| 8 | Open-ended (optional) | What is one thing we could change to make Snap a better place to work? | |
 
 Questions cover four focus areas: **People** (management, leadership, teamwork, accountability), **Processes** (inefficiencies, unnecessary steps, communication breakdowns), **Resources** (staffing, training, technology, workload), and **Culture** (recognition, appreciation, trust, employee involvement). The ratings give a quantitative baseline to compare against future surveys.
 
