@@ -7,6 +7,8 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <style>
 /* Layout: two drop zones, then summary → where it splits → matrix scan → per-vehicle waterfall */
 :root{
@@ -143,19 +145,19 @@ details.filing-box li,details.filing-box p{color:var(--muted);font-size:13.5px;m
 <div class="wrap">
   <header>
     <h1>Rating Difference Finder</h1>
-    <p class="lede">Drop in the rate flow from the original quote and from the restarted one. The tool lines up every step by vehicle, coverage and rate number, so shifted step numbers don't matter, and points to the exact step where the two premiums split.</p>
+    <p class="lede">Drop in the rate flow (PDF or Word) from the original quote and from the restarted one. The tool lines up every step by vehicle, coverage and rate number, so shifted step numbers don't matter, and points to the exact step where the two premiums split.</p>
   </header>
 
   <div class="panes">
     <section class="pane" id="paneA">
-      <div class="ph"><b>Original rate flow <span class="tag">A</span></b><span class="note">.docx</span></div>
-      <label class="drop" tabindex="0" id="dropA"><input type="file" accept=".docx" id="fileA"><strong>Drop the Word file here</strong>or click to choose</label>
+      <div class="ph"><b>Original rate flow <span class="tag">A</span></b><span class="note">PDF or .docx</span></div>
+      <label class="drop" tabindex="0" id="dropA"><input type="file" accept=".pdf,.docx" id="fileA"><strong>Drop the rating PDF or Word file here</strong>or click to choose</label>
       <div class="loaded" id="infoA"></div>
       <details class="paste"><summary>Or paste the table instead</summary><textarea id="textA" spellcheck="false" placeholder="Copy the rate flow table (Step, Rate Number, Description, Rate Mode, Flow Info, Value, Premium) and paste here"></textarea></details>
     </section>
     <section class="pane" id="paneB">
-      <div class="ph"><b>Restarted rate flow <span class="tag">B</span></b><span class="note">.docx</span></div>
-      <label class="drop" tabindex="0" id="dropB"><input type="file" accept=".docx" id="fileB"><strong>Drop the Word file here</strong>or click to choose</label>
+      <div class="ph"><b>Restarted rate flow <span class="tag">B</span></b><span class="note">PDF or .docx</span></div>
+      <label class="drop" tabindex="0" id="dropB"><input type="file" accept=".pdf,.docx" id="fileB"><strong>Drop the rating PDF or Word file here</strong>or click to choose</label>
       <div class="loaded" id="infoB"></div>
       <details class="paste"><summary>Or paste the table instead</summary><textarea id="textB" spellcheck="false" placeholder="Paste the second rate flow table here"></textarea></details>
     </section>
@@ -211,7 +213,7 @@ const MATRIX={NNNNNNN:0,YNNNNNN:5,NYNNNNN:5,YYNNNNN:8,NNYNNNN:10,NNNYNNN:12,YNNY
 const NOISE_MODES=new Set(["DriverVehicleScore2"]);
 const MONEY_MODES=new Set(["AddToBase","Multiply","MultiplyFactor","LookupRate","StepRateZero","StepRateMY2","VehicleSurcharge","AdditionalFee","FilingFee","Divide","EndorsementFactor","Multicar","CoverageTerritory"]);
 
-function num(s){if(s==null)return null;const t=String(s).replace(/[$,\s]/g,"");return t!==""&&!isNaN(t)?parseFloat(t):null}
+function num(s){if(s==null)return null;let t=String(s).trim().replace(/^\$|^-\$/,m=>m==="-$"?"-":"");if(/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t))t=t.replace(/,/g,"");return t!==""&&/^-?\d*\.?\d+(e-?\d+)?$/i.test(t)?parseFloat(t):null}
 
 /* rows: arrays of 7 cells. Splits vehicles at table boundaries (tables[]) or at step-1000 restarts. */
 function buildFlow(tables){
@@ -222,13 +224,13 @@ function buildFlow(tables){
       if(!c||c.length<7)return;
       const [step,rate,desc,mode,info,value,prem]=c.map(x=>(x??"").toString().trim());
       if(/^step$/i.test(step)||!/^\d+$/.test(rate))return;
-      if(!cur||(rate==="1000"&&cur.rows.length>5)){cur={no:out.vehicles.length+1,rows:[],premium:0,section:"Setup",cov:null};out.vehicles.push(cur)}
+      if(!cur||(rate==="1000"&&cur.rows.length>5)){cur={no:out.vehicles.length+1,label:cur?null:(rows.label||null),rows:[],premium:0,section:"Setup",cov:null};out.vehicles.push(cur)}
       out.steps++;
       const r=+rate;
       const m=info.match(/CoverageCode='?([A-Z]{2,6})'?/);
-      const premLine=desc.match(/^([A-Z]{2,6}) Premium$/i);
+      const premLine=mode==="AddToBase"&&desc.match(/^([A-Z][A-Z0-9]{1,11}) Premium\b/);
       let section;
-      if(premLine){section=premLine[1].toUpperCase();cur.cov=null}
+      if(premLine){const nm=premLine[1];section=cur.cov&&nm.startsWith(cur.cov)?cur.cov:nm;cur.cov=null}
       else if(mode==="CallSub"||r>=100000){if(m)cur.cov=m[1];section=cur.cov||"Coverage"}
       else if(r>=9000)section="Fees";
       else section="Setup";
@@ -272,7 +274,7 @@ function compareFlows(A,B){
     const firstSplit={};
     rows.forEach(r=>{if(r.status!=="same"&&!r.noise&&MONEY_MODES.has(r.mode)&&!firstSplit[r.section])firstSplit[r.section]=r});
     const covs=[...new Set([...Object.keys(va?.coverages||{}),...Object.keys(vb?.coverages||{})])].map(c=>({cov:c,a:va?.coverages[c]??null,b:vb?.coverages[c]??null}));
-    veh.push({no:i+1,rows,sections,firstSplit,covs,premA:va?.premium??null,premB:vb?.premium??null,onlyIn:!va?"B":!vb?"A":null});
+    veh.push({no:i+1,label:va?.label||vb?.label||null,rows,sections,firstSplit,covs,premA:va?.premium??null,premB:vb?.premium??null,onlyIn:!va?"B":!vb?"A":null});
   }
   return {veh,totalA:A.total,totalB:B.total,matrixA:A.matrix,matrixB:B.matrix,stepsA:A.steps,stepsB:B.steps};
   function mk(ra,rb){
@@ -280,6 +282,49 @@ function compareFlows(A,B){
     let status=!ra?"onlyB":!rb?"onlyA":!same(ra.value,rb.value)?"changed":ra.info!==rb.info?"info":"same";
     return {key:r.key,section:r.section,rate:r.rate,desc:r.desc,mode:r.mode,noise:r.noise,a:ra,b:rb,status};
   }
+}
+
+/* PDF rate flows: pages = [[{s,x,y}]] (pdf.js text items). Columns found from the header row. */
+function pdfToTables(pages){
+  let col=null;const tables=[];let cur=null;let label=null;
+  const push=()=>{if(cur&&cur.length){cur.label=label;tables.push(cur)}};
+  pages.forEach(items=>{
+    const it=items.filter(i=>i.s.trim()).map(i=>({s:i.s.trim(),x:i.x,y:i.y}));
+    const hd=(n)=>it.find(i=>i.s===n);
+    if(hd("Rate Mode")&&hd("Flow Info")){
+      col={rate:(hd("Rate")||hd("Number")).x,desc:hd("Description").x,mode:hd("Rate Mode").x,info:hd("Flow Info").x,value:hd("Value").x,prem:hd("Premium").x};
+      const hy=Math.max(...["Step","Rate","Number","Description","Rate Mode","Flow Info","Value","Premium"].map(n=>hd(n)?.y??-1));
+      const hmin=Math.min(...["Step","Description","Number"].map(n=>hd(n)?.y??9999));
+      it.forEach(i=>{if(i.y>=hmin-1&&i.y<=hy+1&&i.x>=0)i.skip=true});
+    }
+    if(!col)return;
+    const body=it.filter(i=>!i.skip&&i.s!=="Rating Flow"&&!/^Page \d+/i.test(i.s));
+    const stepX=col.rate-10;
+    const modeL=col.mode-8,infoL=col.info-8,valL=col.info+10,premL=col.prem+5;
+    const isVeh=i=>i.x<col.rate&&/\b[A-HJ-NPR-Z0-9]{17}\b/.test(i.s);
+    const anchors=body.filter(i=>(i.x>=stepX&&i.x<modeL&&/^\d{3,7}(\s|$)/.test(i.s))||isVeh(i)).sort((a,b)=>b.y-a.y||a.x-b.x);
+    anchors.forEach((a,k)=>{
+      const top=a.y+3,bot=k+1<anchors.length?anchors[k+1].y+3:-1e9;
+      if(isVeh(a)){push();cur=[];label=a.s;return}
+      if(!cur){cur=[];label=null}
+      const band=body.filter(i=>i.y<=top&&i.y>bot&&!isVeh(i)).sort((p,q)=>q.y-p.y||p.x-q.x);
+      const m=a.s.match(/^(\d{3,7})\s*(.*)$/);
+      const pick=f=>band.filter(i=>i!==a&&f(i)).map(i=>i.s).join(" ").replace(/\s+/g," ").trim();
+      const step=(band.find(i=>i.x<stepX&&/^\d+$/.test(i.s))||{}).s||"";
+      const desc=(m[2]+" "+pick(i=>i.x>=stepX&&i.x<modeL)).trim();
+      const mode=pick(i=>i.x>=modeL&&i.x<infoL);
+      const info=pick(i=>i.x>=infoL&&i.x<valL);
+      const value=pick(i=>i.x>=valL&&i.x<premL&&Math.abs(i.y-a.y)<2);
+      const prem=pick(i=>i.x>=premL&&Math.abs(i.y-a.y)<2);
+      cur.push([step,m[1],desc,mode,info,value,prem]);
+    });
+  });
+  push();
+  /* a few PDF cells print the mode on the description line: move it back */
+  const modes=new Set(tables.flat().map(r=>r[3]).filter(Boolean));
+  tables.flat().forEach(r=>{if(r[3])return;for(const md of modes){if(r[2].endsWith(" "+md)){r[2]=r[2].slice(0,-md.length-1).trim();r[3]=md.replace(/\s/g,"");break}}
+    if(!r[3]){const mm=r[2].match(/^(.*?)\s+([A-Z][a-z]+[A-Z][A-Za-z0-9]*|TPR \d+)$/);if(mm){r[2]=mm[1];r[3]=mm[2]}}});
+  return tables;
 }
 
 
@@ -293,6 +338,20 @@ const short=v=>{const n=num(v);if(n==null)return esc(v);return Math.abs(n)>=1000
 const state={A:null,B:null,C:null,veh:0,cov:null};
 const W="http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
+async function readPdf(file){
+  if(!window.pdfjsLib)throw new Error("The PDF reader didn't load. Check the internet connection and reload the page.");
+  if(window.pdfjsWorker)pdfjsLib.GlobalWorkerOptions.workerSrc="";
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;const pages=[];
+  for(let n=1;n<=doc.numPages;n++){const tc=await (await doc.getPage(n)).getTextContent();pages.push(tc.items.map(i=>({s:i.str,x:i.transform[4],y:i.transform[5]})))}
+  return pdfToTables(pages);
+}
+async function readFile(file){
+  const buf=file.arrayBuffer?await file.arrayBuffer():file;const head=new Uint8Array(buf.slice(0,4));
+  const sig=String.fromCharCode(...head);
+  if(sig==="%PDF")return readPdf({arrayBuffer:async()=>buf});
+  if(sig.startsWith("PK"))return readDocx(buf);
+  throw new Error("Use the rating PDF or a .docx rate flow. Older .doc files need to be saved as .docx first.");
+}
 async function readDocx(file){
   const zip=await JSZip.loadAsync(file);
   const f=zip.file("word/document.xml");if(!f)throw new Error("This file has no Word document inside. Save the rate flow as .docx and try again.");
@@ -304,8 +363,8 @@ function describe(f){return `<span class="ok">✓</span><span>${f.vehicles.lengt
 async function loadFile(side,file){
   const info=$("info"+side);info.innerHTML=`<span>Reading ${esc(file.name)}…</span>`;$("sampleTag").hidden=true;
   try{
-    const tables=await readDocx(file);const flow=buildFlow(tables);
-    if(!flow.steps)throw new Error("No rate flow table found. The table needs the columns Step, Rate Number, Description, Rate Mode, Flow Info, Value, Premium.");
+    const tables=await readFile(file);const flow=buildFlow(tables);
+    if(!flow.steps)throw new Error("No rate flow found in this file. It needs the Rating Flow table (Step, Rate Number, Description, Rate Mode, Flow Info, Value, Premium).");
     state[side]=flow;info.innerHTML=`<span>${esc(file.name)}</span>`+describe(flow);
     if(state.A&&state.B)compare();
   }catch(e){state[side]=null;info.innerHTML=`<span class="err">${esc(e.message||"Could not read this file.")}</span>`}
@@ -380,7 +439,7 @@ function compare(){
 
 function renderVehicles(){
   const C=state.C;if(!C)return;$("vehbox").hidden=false;
-  $("tabs").innerHTML=C.veh.map((v,i)=>`<button class="tab" role="tab" aria-selected="${i===state.veh}" data-v="${i}">Vehicle ${v.no}${Object.keys(v.firstSplit).length||v.onlyIn?'<span class="dot" title="Has changes"></span>':""}</button>`).join("");
+  $("tabs").innerHTML=C.veh.map((v,i)=>`<button class="tab" role="tab" aria-selected="${i===state.veh}" data-v="${i}">Vehicle ${v.no}${v.label?" · "+esc(v.label.replace(/^\(\d+\)\s*/,"").replace(/\s+[A-HJ-NPR-Z0-9]{17}$/,"")):""}${Object.keys(v.firstSplit).length||v.onlyIn?'<span class="dot" title="Has changes"></span>':""}</button>`).join("");
   $("tabs").querySelectorAll(".tab").forEach(b=>b.onclick=()=>{state.veh=+b.dataset.v;state.cov=null;renderVehicles()});
   const v=C.veh[state.veh];
   const secs=["All",...v.sections];
