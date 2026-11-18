@@ -175,12 +175,6 @@ details.filing-box li,details.filing-box p{color:var(--muted);font-size:13.5px;m
   <section class="summary" id="summary"></section>
   <section class="splits" id="splits" hidden></section>
 
-  <section class="scan" id="scan" hidden>
-    <div class="scan-head"><h2>Discount matrix scan</h2><span class="scan-meta" id="scanMeta"></span></div>
-    <div class="slots" id="slots"></div>
-    <div class="gridwrap"><div class="mgrid" id="mgrid"></div></div>
-    <div class="legend"><span><i class="sw a"></i>A · original</span><span><i class="sw b"></i>B · restarted</span><span><i class="sw ab"></i>Same cell</span></div>
-  </section>
 
   <section class="vehbox" id="vehbox" hidden>
     <h2>Step by step</h2>
@@ -431,7 +425,6 @@ function compare(){
   if(fa.length)items.push(`<div class="split"><span class="where">Fees</span><div class="what">${fa.slice(0,3).map(explain).join("; ")}</div><span class="delta"></span></div>`);
   $("splits").hidden=false;
   $("splits").innerHTML=`<h2>Where the premiums split</h2>`+(items.length?items.join(""):`<p class="note">No factor step differs between the two flows. If the totals differ, compare the fee lines below.</p>`);
-  renderMatrix(C.matrixA?.key,C.matrixB?.key);
   const firstVeh=C.veh.findIndex(v=>Object.keys(v.firstSplit).length);state.veh=firstVeh<0?0:firstVeh;
   const fv=C.veh[state.veh];state.cov=fv?Object.keys(fv.firstSplit)[0]||null:null;
   renderVehicles();
@@ -527,7 +520,7 @@ function load(){
 }
 $("run").onclick=compare;
 $("swap").onclick=()=>{[state.A,state.B]=[state.B,state.A];const t=$("textA").value;$("textA").value=$("textB").value;$("textB").value=t;const i=$("infoA").innerHTML;$("infoA").innerHTML=$("infoB").innerHTML;$("infoB").innerHTML=i;compare()};
-$("clear").onclick=()=>{state.A=state.B=state.C=null;["A","B"].forEach(s=>{$("text"+s).value="";$("info"+s).innerHTML="";$("file"+s).value=""});$("sampleTag").hidden=true;$("summary").innerHTML="";$("splits").hidden=true;$("scan").hidden=true;$("vehbox").hidden=true};
+$("clear").onclick=()=>{state.A=state.B=state.C=null;["A","B"].forEach(s=>{$("text"+s).value="";$("info"+s).innerHTML="";$("file"+s).value=""});$("sampleTag").hidden=true;$("summary").innerHTML="";$("splits").hidden=true;$("vehbox").hidden=true};
 $("load").onclick=load;
 load();
 </script>
