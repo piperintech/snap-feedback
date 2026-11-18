@@ -6,8 +6,9 @@
 <title>Rating Difference Finder</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
-/* Layout: two paste panes side by side, then a ledger-style diff table with the changed rows on top */
+/* Layout: two drop zones, then summary → where it splits → matrix scan → per-vehicle waterfall */
 :root{
   --bg:#f5f7f9; --surface:#ffffff; --fg:#14202b; --muted:#5b6b78; --line:#d9e1e7;
   --accent:#0b5d8c; --accent-soft:#e3eff7;
@@ -28,50 +29,78 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-
 .wrap{max-width:1180px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
 header{display:grid;gap:6px}
 h1{font-size:26px;font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
-.lede{margin:0;color:var(--muted);max-width:68ch}
+h2{font-size:15px;margin:0;font-weight:600}
+.lede{margin:0;color:var(--muted);max-width:72ch}
 .panes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media (max-width:720px){.panes{grid-template-columns:1fr}}
-.pane{display:grid;gap:8px;min-width:0}
-.pane label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
-.pane label span.tag{color:var(--accent)}
-textarea{width:100%;min-height:220px;resize:vertical;font-family:var(--mono);font-size:12.5px;line-height:1.55;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg)}
-textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.pane{display:grid;gap:8px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px}
+.pane .ph{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.pane .ph b{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pane .ph .tag{font-family:var(--mono);color:var(--accent);font-weight:500}
+.drop{border:1.5px dashed var(--line);border-radius:6px;padding:16px;text-align:center;display:grid;gap:6px;cursor:pointer;color:var(--muted);font-size:13.5px}
+.drop:hover,.drop.over{border-color:var(--accent);color:var(--fg);background:var(--accent-soft)}
+.drop strong{color:var(--fg);font-weight:500}
+.drop input{display:none}
+.loaded{font-family:var(--mono);font-size:12.5px;color:var(--fg);display:flex;flex-wrap:wrap;gap:6px 12px;min-height:20px}
+.loaded .ok{color:var(--down)} .loaded .err{color:var(--up)}
+details.paste summary{cursor:pointer;font-size:13px;color:var(--accent)}
+textarea{width:100%;min-height:120px;margin-top:8px;resize:vertical;font-family:var(--mono);font-size:12px;line-height:1.5;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+textarea:focus,button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 button{font:inherit;font-weight:500;border-radius:6px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button[disabled]{opacity:.5;cursor:not-allowed}
 .note{font-size:13px;color:var(--muted)}
 .sample{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--warn-soft);color:var(--warn)}
 .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:2px}
 .stat .k{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .stat .v{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
-.stat.hot{border-color:var(--up)}
-.reasons{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:grid;gap:8px}
-.reasons h2,.tablebox h2{font-size:15px;margin:0;font-weight:600}
-.reasons ul{margin:0;padding-left:18px;display:grid;gap:6px}
-.reasons li{max-width:90ch}
-.filing{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-left:6px;white-space:nowrap}
-.tablebox{display:grid;gap:10px}
-.tabhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
-.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
-table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
-th{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--bg);position:sticky;top:0}
-td.lbl,th.lbl{text-align:left;white-space:normal;min-width:180px}
-td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
-tr.changed td.lbl{box-shadow:inset 3px 0 0 var(--up)}
-tr.onlyA td.lbl,tr.onlyB td.lbl{box-shadow:inset 3px 0 0 var(--warn)}
+.stat.hot{border-color:var(--up)} .stat.hot .v{color:var(--up)}
+.splits{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:grid;gap:10px}
+.split{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line)}
+.split:first-of-type{border-top:0}
+.where{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--accent);white-space:nowrap}
+.what{min-width:0}
+.what small{display:block;color:var(--muted);font-family:var(--mono);font-size:11.5px;word-break:break-word}
+.delta{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500;white-space:nowrap}
+.delta.up{color:var(--up)} .delta.down{color:var(--down)}
+@media (max-width:560px){.split{grid-template-columns:1fr}.delta{justify-self:start}}
+.filing{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-left:6px;white-space:nowrap;font-family:var(--sans)}
+.vehbox{display:grid;gap:12px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tab{padding:6px 12px;font-size:13.5px}
+.tab[aria-selected="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+.tab .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--up);margin-left:6px;vertical-align:1px}
+.covs{display:flex;flex-wrap:wrap;gap:8px}
+.cov{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:8px 12px;display:grid;gap:1px;min-width:130px;text-align:left;cursor:pointer}
+.cov .n{font-size:12px;font-weight:600;letter-spacing:.05em;color:var(--muted)}
+.cov .p{font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums}
+.cov.ch{border-color:var(--up)}
+.cov[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px}
+.filters{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.filters label{font-size:13px;color:var(--muted);display:flex;gap:5px;align-items:center}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface);max-height:640px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;vertical-align:top}
+th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--bg);position:sticky;top:0;z-index:1}
+td.l,th.l{text-align:left}
+td.desc{white-space:normal;min-width:200px;text-align:left}
+td.desc small{display:block;color:var(--muted);font-family:var(--mono);font-size:11px;white-space:normal;word-break:break-word;max-width:62ch}
+td.num,td.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr.changed td.desc,tr.info td.desc{box-shadow:inset 3px 0 0 var(--up)}
+tr.info td.desc{box-shadow:inset 3px 0 0 var(--warn)}
+tr.onlyA td.desc,tr.onlyB td.desc{box-shadow:inset 3px 0 0 var(--warn)}
+tr.first{background:var(--up-soft)}
 tr.same{color:var(--muted)}
-.cell-up{background:var(--up-soft);color:var(--up);font-weight:500}
-.cell-down{background:var(--down-soft);color:var(--down);font-weight:500}
-.chip{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;font-family:var(--sans)}
-.chip.c{background:var(--up-soft);color:var(--up)} .chip.s{background:var(--bg);color:var(--muted)} .chip.o{background:var(--warn-soft);color:var(--warn)}
+.cell-up{color:var(--up);font-weight:500} .cell-down{color:var(--down);font-weight:500}
 .old{color:var(--muted);text-decoration:line-through;margin-right:4px}
-.arrow{color:var(--muted);margin:0 3px}
+.chip{font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:999px;font-family:var(--sans)}
+.chip.c{background:var(--up-soft);color:var(--up)} .chip.o{background:var(--warn-soft);color:var(--warn)} .chip.f{background:var(--up);color:var(--surface)}
 .empty{padding:22px;color:var(--muted);text-align:center}
-details{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
-summary{cursor:pointer;font-weight:600}
-details p,details li{color:var(--muted);font-size:13.5px;max-width:80ch}
+details.filing-box{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+details.filing-box summary{cursor:pointer;font-weight:600}
+details.filing-box li,details.filing-box p{color:var(--muted);font-size:13.5px;max-width:80ch}
 .scan{--sbg:#0a1620;--sfg:#cfe6f5;--sdim:#4d6a7f;--sline:#1c3446;--ca:#38bdf8;--cb:#f59e0b;--cab:#34d399;
   background:var(--sbg);color:var(--sfg);border-radius:10px;padding:16px;display:grid;gap:14px;position:relative;overflow:hidden;font-family:var(--mono);
   background-image:linear-gradient(var(--sline) 1px,transparent 1px),linear-gradient(90deg,var(--sline) 1px,transparent 1px);background-size:22px 22px}
@@ -106,6 +135,7 @@ details p,details li{color:var(--muted);font-size:13.5px;max-width:80ch}
 .sw.a{background:var(--ca)} .sw.b{background:var(--cb)} .sw.ab{background:var(--cab)}
 @media (max-width:560px){.slots{grid-template-columns:44px repeat(7,minmax(0,1fr));gap:4px}.slots .sh{font-size:9px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.scan.run::after{animation:none}}
+
 </style>
 </head>
 <body>
@@ -113,18 +143,22 @@ details p,details li{color:var(--muted);font-size:13.5px;max-width:80ch}
 <div class="wrap">
   <header>
     <h1>Rating Difference Finder</h1>
-    <p class="lede">Paste the rating information from the original quote and from the restarted one. The tool lines up every factor and shows exactly which numbers changed and how much each one moved the premium.</p>
+    <p class="lede">Drop in the rate flow from the original quote and from the restarted one. The tool lines up every step by vehicle, coverage and rate number, so shifted step numbers don't matter, and points to the exact step where the two premiums split.</p>
   </header>
 
   <div class="panes">
-    <div class="pane">
-      <label for="a">Original rating <span class="tag">A</span></label>
-      <textarea id="a" spellcheck="false" placeholder="Copy the rating table from the policy screen and paste it here"></textarea>
-    </div>
-    <div class="pane">
-      <label for="b">Restarted rating <span class="tag">B</span></label>
-      <textarea id="b" spellcheck="false" placeholder="Paste the second rating table here"></textarea>
-    </div>
+    <section class="pane" id="paneA">
+      <div class="ph"><b>Original rate flow <span class="tag">A</span></b><span class="note">.docx</span></div>
+      <label class="drop" tabindex="0" id="dropA"><input type="file" accept=".docx" id="fileA"><strong>Drop the Word file here</strong>or click to choose</label>
+      <div class="loaded" id="infoA"></div>
+      <details class="paste"><summary>Or paste the table instead</summary><textarea id="textA" spellcheck="false" placeholder="Copy the rate flow table (Step, Rate Number, Description, Rate Mode, Flow Info, Value, Premium) and paste here"></textarea></details>
+    </section>
+    <section class="pane" id="paneB">
+      <div class="ph"><b>Restarted rate flow <span class="tag">B</span></b><span class="note">.docx</span></div>
+      <label class="drop" tabindex="0" id="dropB"><input type="file" accept=".docx" id="fileB"><strong>Drop the Word file here</strong>or click to choose</label>
+      <div class="loaded" id="infoB"></div>
+      <details class="paste"><summary>Or paste the table instead</summary><textarea id="textB" spellcheck="false" placeholder="Paste the second rate flow table here"></textarea></details>
+    </section>
   </div>
 
   <div class="bar">
@@ -132,32 +166,33 @@ details p,details li{color:var(--muted);font-size:13.5px;max-width:80ch}
     <button id="swap">Swap A and B</button>
     <button id="clear">Clear</button>
     <button id="load">Load example</button>
-    <span class="sample" id="sampleTag">Example data loaded</span>
-    <span class="note">Works with tab-separated tables copied from the system or "Factor: value" lines. Rows are matched by their label.</span>
+    <span class="sample" id="sampleTag" hidden>Example data, not a real policy</span>
+    <span class="note">Files are read in this browser only. Nothing is uploaded or saved.</span>
   </div>
 
   <section class="summary" id="summary"></section>
-  <section class="reasons" id="reasons" hidden></section>
+  <section class="splits" id="splits" hidden></section>
 
   <section class="scan" id="scan" hidden>
-    <div class="scan-head">
-      <h2>Discount matrix scan</h2>
-      <span class="scan-meta" id="scanMeta"></span>
-    </div>
+    <div class="scan-head"><h2>Discount matrix scan</h2><span class="scan-meta" id="scanMeta"></span></div>
     <div class="slots" id="slots"></div>
     <div class="gridwrap"><div class="mgrid" id="mgrid"></div></div>
     <div class="legend"><span><i class="sw a"></i>A · original</span><span><i class="sw b"></i>B · restarted</span><span><i class="sw ab"></i>Same cell</span></div>
   </section>
 
-  <section class="tablebox">
-    <div class="tabhead">
-      <h2>Line by line</h2>
-      <label class="note"><input type="checkbox" id="onlyChanged" checked> Show only rows that changed</label>
+  <section class="vehbox" id="vehbox" hidden>
+    <h2>Step by step</h2>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="covs" id="covs"></div>
+    <div class="filters">
+      <label><input type="checkbox" id="onlyChanged" checked> Only steps that changed</label>
+      <label><input type="checkbox" id="moneyOnly"> Only steps that move the premium</label>
+      <label><input type="checkbox" id="showNoise"> Include driver scoring lines</label>
     </div>
-    <div class="scroll"><table id="tbl"><tbody><tr><td class="empty">Paste two ratings and press Compare.</td></tr></tbody></table></div>
+    <div class="scroll"><table id="tbl"></table></div>
   </section>
 
-  <details>
+  <details class="filing-box">
     <summary>Filing changes to keep in mind (new business 11/3/2026, renewals 12/3/2026)</summary>
     <ul>
       <li>Six-month policy term factor 6.30 → 6.00</li>
@@ -166,183 +201,275 @@ details p,details li{color:var(--muted);font-size:13.5px;max-width:80ch}
       <li>Ren1 / Ren2 allowed lapse cut from 15 days to 5 days. A restart with a 6+ day lapse loses the renewal discount.</li>
       <li>New discount matrix with more combinations; new 15-year-old and widowed driver classes; new model years 2025–2027; 12 new territories (no factor change).</li>
     </ul>
-    <p>When a changed factor matches one of these, the tool tags it "Filing change". A 7-letter Y/N discount key is decoded automatically.</p>
+    <p>The discount key is rebuilt from the flow's "Lookup discount matrix amount" step (Homeowner + DiscMatrix2 + DiscMatrix3 + DiscMatrix4).</p>
   </details>
 </div>
 
 <script>
+/* Rate flow engine: pure functions, no DOM. */
 const MATRIX={NNNNNNN:0,YNNNNNN:5,NYNNNNN:5,YYNNNNN:8,NNYNNNN:10,NNNYNNN:12,YNNYNNN:15,YNYNNNN:15,NNNNYNN:18,YNNNYNN:21,NNNNNYN:18,NNNNNNY:27,YNNNNYN:22,YNNNNNY:27,NYNNNYN:20,YYNNNYN:23,NYNNNNY:27,NNNYNYN:26,NNYNNYN:25,YYNNNNY:31,YNYNNNY:36,NNYNNNY:36,NNNYNNY:36,YNYNNYN:30,YNNYNYN:32,YNNYNNY:37,NNNNYYN:38,YNNNYYN:38,NNNNYNY:40,YNNNYNY:40,NYNYNNN:12,YYNYNNN:15,NYNNYNN:18,YYNNYNN:21,NYNYNYN:26,NYNYNNY:36,YYNYNYN:32,YYNYNNY:37,NYNNYYN:38,YYNNYYN:38,NYNNYNY:40,YYNNYNY:40,NNYYNNN:12,YNYYNNN:15,NNYNYNN:18,YNYNYNN:21,NNYYNYN:26,NNYYNNY:36,YNYYNYN:32,YNYYNNY:37,NNYNYYN:38,YNYNYYN:38,NNYNYNY:40,YNYNYNY:40};
-const SLOTS=["Homeowner","Prior 1–30 lapse","Prior no lapse","Ren1","Ren2","Multicar drv≥veh","Multicar veh>drv"];
-const FILING=[
-  {test:(l,a,b)=>/term/.test(l)&&a===6.3&&b===6,txt:"6-month term factor 6.30→6.00"},
-  {test:(l,a,b)=>/(intl|international|foreign|license|lic)/.test(l)&&((a===1.5&&b===1.05)||(a===1.05&&b===1.5)),txt:"Intl license 1.50→1.05"},
-  {test:(l,a,b)=>/(pickup|truck)/.test(l)&&(b===1||a===1),txt:"Pickup surcharge removed"},
-  {test:(l)=>/(disc|ren|lapse|prior)/.test(l),txt:"Check renewal lapse (now 5 days)"}
-];
+const NOISE_MODES=new Set(["DriverVehicleScore2"]);
+const MONEY_MODES=new Set(["AddToBase","Multiply","MultiplyFactor","LookupRate","StepRateZero","StepRateMY2","VehicleSurcharge","AdditionalFee","FilingFee","Divide","EndorsementFactor","Multicar","CoverageTerritory"]);
 
-const $=id=>document.getElementById(id);
-const fmt=n=>{if(n==null||isNaN(n))return"—";const d=Math.abs(n)<10&&n%1!==0?3:2;return n.toLocaleString("en-US",{minimumFractionDigits:n%1===0&&Math.abs(n)<100?0:2,maximumFractionDigits:d})};
-const money=n=>(n<0?"−$":"$")+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
-const toNum=s=>{const t=String(s).trim().replace(/[$,%]/g,"").replace(/^\((.*)\)$/,"-$1");return t!==""&&!isNaN(t)?parseFloat(t):null};
-const norm=s=>s.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+function num(s){if(s==null)return null;const t=String(s).replace(/[$,\s]/g,"");return t!==""&&!isNaN(t)?parseFloat(t):null}
 
-function parse(text){
-  const rows=[];let headers=null;const seen={};
-  text.split(/\r?\n/).forEach(raw=>{
-    const line=raw.replace(/\s+$/,"");if(!line.trim())return;
-    let cells=line.includes("\t")?line.split("\t"):line.split(/\s{2,}|:\s+|\s*\|\s*/);
-    cells=cells.map(c=>c.trim()).filter(c=>c!=="");
-    if(!cells.length)return;
-    const nums=[],labels=[];let key=null;
-    cells.forEach(c=>{if(/^[YN]{7}$/i.test(c)){key=c.toUpperCase();return}const n=toNum(c);if(n!==null)nums.push(n);else labels.push(c)});
-    if(!nums.length&&!key){if(labels.length>=2)headers=labels.slice(1);else headers=headers;return}
-    let label=labels.join(" ")||("Row "+(rows.length+1));
-    let k=norm(label)||label;seen[k]=(seen[k]||0)+1;if(seen[k]>1)k+=" #"+seen[k];
-    if(key){nums.push(MATRIX[key]??NaN)}
-    rows.push({key:k,label,nums,dkey:key,headers});
+/* rows: arrays of 7 cells. Splits vehicles at table boundaries (tables[]) or at step-1000 restarts. */
+function buildFlow(tables){
+  const out={vehicles:[],steps:0,matrix:null};
+  tables.forEach(rows=>{
+    let cur=null;
+    rows.forEach(c=>{
+      if(!c||c.length<7)return;
+      const [step,rate,desc,mode,info,value,prem]=c.map(x=>(x??"").toString().trim());
+      if(/^step$/i.test(step)||!/^\d+$/.test(rate))return;
+      if(!cur||(rate==="1000"&&cur.rows.length>5)){cur={no:out.vehicles.length+1,rows:[],premium:0,section:"Setup",cov:null};out.vehicles.push(cur)}
+      out.steps++;
+      const r=+rate;
+      const m=info.match(/CoverageCode='?([A-Z]{2,6})'?/);
+      const premLine=desc.match(/^([A-Z]{2,6}) Premium$/i);
+      let section;
+      if(premLine){section=premLine[1].toUpperCase();cur.cov=null}
+      else if(mode==="CallSub"||r>=100000){if(m)cur.cov=m[1];section=cur.cov||"Coverage"}
+      else if(r>=9000)section="Fees";
+      else section="Setup";
+      const fm=info.match(/\{\s*([-\d.]+)\s+applied to prem/);
+      const pv=num(prem);if(pv!=null)cur.premium=pv;
+      const row={step:+step,rate:r,desc,mode,info,value,prem:pv,section,factor:fm?parseFloat(fm[1]):null,premLine:!!premLine,noise:NOISE_MODES.has(mode)};
+      cur.rows.push(row);
+      if(!out.matrix&&/DiscMatrix2=/.test(info)){
+        const g=k=>(info.match(new RegExp(k+"=([YN]+)"))||[])[1]||"";
+        const key=(g("Homeowner")+g("DiscMatrix2")+g("DiscMatrix3")+g("DiscMatrix4")).toUpperCase();
+        out.matrix={key:key.length===7?key:null,raw:info,factor:num(value)};
+      }
+    });
   });
-  return rows;
+  out.vehicles.forEach(v=>{
+    const seen={};
+    v.rows.forEach(r=>{const k=`${r.section}|${r.rate}|${r.desc}`;seen[k]=(seen[k]||0)+1;r.key=k+"|"+seen[k]});
+    v.coverages={};
+    v.rows.filter(r=>r.premLine).forEach(r=>{v.coverages[r.section]=num(r.value)});
+  });
+  out.total=out.vehicles.reduce((s,v)=>s+(v.premium||0),0);
+  return out;
 }
 
-function totalOf(rows){
-  const r=[...rows].reverse().find(x=>/(total|premium|grand)/.test(x.key));
-  return r?r.nums[r.nums.length-1]:null;
+/* Parse pasted text: tab-separated rows, 7 cells. */
+function parseFlowText(text){
+  const rows=text.split(/\r?\n/).map(l=>l.split("\t")).filter(c=>c.length>=7);
+  return rows.length?buildFlow([rows]):null;
+}
+
+function same(a,b){if(a===b)return true;const x=num(a),y=num(b);return x!=null&&y!=null&&Math.abs(x-y)<1e-9}
+
+function compareFlows(A,B){
+  const n=Math.max(A.vehicles.length,B.vehicles.length);const veh=[];
+  for(let i=0;i<n;i++){
+    const va=A.vehicles[i],vb=B.vehicles[i];
+    const mb=new Map((vb?.rows||[]).map(r=>[r.key,r]));const used=new Set();const rows=[];
+    (va?.rows||[]).forEach(ra=>{const rb=mb.get(ra.key);if(rb)used.add(ra.key);rows.push(mk(ra,rb))});
+    (vb?.rows||[]).forEach(rb=>{if(!used.has(rb.key))rows.push(mk(null,rb))});
+    const sections=[...new Set(rows.map(r=>r.section))];
+    const firstSplit={};
+    rows.forEach(r=>{if(r.status!=="same"&&!r.noise&&MONEY_MODES.has(r.mode)&&!firstSplit[r.section])firstSplit[r.section]=r});
+    const covs=[...new Set([...Object.keys(va?.coverages||{}),...Object.keys(vb?.coverages||{})])].map(c=>({cov:c,a:va?.coverages[c]??null,b:vb?.coverages[c]??null}));
+    veh.push({no:i+1,rows,sections,firstSplit,covs,premA:va?.premium??null,premB:vb?.premium??null,onlyIn:!va?"B":!vb?"A":null});
+  }
+  return {veh,totalA:A.total,totalB:B.total,matrixA:A.matrix,matrixB:B.matrix,stepsA:A.steps,stepsB:B.steps};
+  function mk(ra,rb){
+    const r=ra||rb;
+    let status=!ra?"onlyB":!rb?"onlyA":!same(ra.value,rb.value)?"changed":ra.info!==rb.info?"info":"same";
+    return {key:r.key,section:r.section,rate:r.rate,desc:r.desc,mode:r.mode,noise:r.noise,a:ra,b:rb,status};
+  }
+}
+
+
+</script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money=n=>n==null||isNaN(n)?"—":(n<0?"−$":"$")+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const sdelta=n=>n==null||isNaN(n)?"—":(n>0?"+":n<0?"−":"")+"$"+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const short=v=>{const n=num(v);if(n==null)return esc(v);return Math.abs(n)>=1000?n.toLocaleString("en-US",{maximumFractionDigits:2}):String(+n.toFixed(4))};
+const state={A:null,B:null,C:null,veh:0,cov:null};
+const W="http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+async function readDocx(file){
+  const zip=await JSZip.loadAsync(file);
+  const f=zip.file("word/document.xml");if(!f)throw new Error("This file has no Word document inside. Save the rate flow as .docx and try again.");
+  const xml=new DOMParser().parseFromString(await f.async("string"),"application/xml");
+  const tables=[...xml.getElementsByTagNameNS(W,"tbl")];
+  return tables.map(t=>[...t.getElementsByTagNameNS(W,"tr")].map(tr=>[...tr.getElementsByTagNameNS(W,"tc")].map(tc=>[...tc.getElementsByTagNameNS(W,"p")].map(p=>[...p.getElementsByTagNameNS(W,"t")].map(x=>x.textContent).join("")).join(" ").trim())));
+}
+function describe(f){return `<span class="ok">✓</span><span>${f.vehicles.length} vehicle${f.vehicles.length===1?"":"s"}</span><span>${f.steps} steps</span><span>${money(f.total)}</span>${f.matrix?.key?`<span>key ${f.matrix.key}</span>`:""}`}
+async function loadFile(side,file){
+  const info=$("info"+side);info.innerHTML=`<span>Reading ${esc(file.name)}…</span>`;$("sampleTag").hidden=true;
+  try{
+    const tables=await readDocx(file);const flow=buildFlow(tables);
+    if(!flow.steps)throw new Error("No rate flow table found. The table needs the columns Step, Rate Number, Description, Rate Mode, Flow Info, Value, Premium.");
+    state[side]=flow;info.innerHTML=`<span>${esc(file.name)}</span>`+describe(flow);
+    if(state.A&&state.B)compare();
+  }catch(e){state[side]=null;info.innerHTML=`<span class="err">${esc(e.message||"Could not read this file.")}</span>`}
+}
+function fromText(side){
+  const t=$("text"+side).value.trim();if(!t)return;
+  const f=parseFlowText(t);
+  if(f&&f.steps){state[side]=f;$("info"+side).innerHTML="<span>Pasted table</span>"+describe(f)}
+  else $("info"+side).innerHTML=`<span class="err">Couldn't find rate flow rows. Copy the whole table, including the Rate Number and Premium columns.</span>`;
+}
+["A","B"].forEach(s=>{
+  const d=$("drop"+s),inp=$("file"+s);
+  inp.onchange=()=>inp.files[0]&&loadFile(s,inp.files[0]);
+  d.addEventListener("dragover",e=>{e.preventDefault();d.classList.add("over")});
+  d.addEventListener("dragleave",()=>d.classList.remove("over"));
+  d.addEventListener("drop",e=>{e.preventDefault();d.classList.remove("over");const f=e.dataTransfer.files[0];if(f)loadFile(s,f)});
+  d.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();inp.click()}});
+  $("text"+s).addEventListener("input",()=>{$("sampleTag").hidden=true;fromText(s)});
+});
+
+function factorText(r){if(!r)return"—";return r.factor!=null?`×${short(r.factor)}`:short(r.value)}
+function explain(r){
+  const a=r.a,b=r.b;
+  if(!a)return`Only in B: ${esc(r.desc)} (${esc(b.value)})`;
+  if(!b)return`Only in A: ${esc(r.desc)} (${esc(a.value)})`;
+  if(a.factor!=null||b.factor!=null)return`${esc(r.desc)}: factor ${short(a.factor)} → ${short(b.factor)}`;
+  return`${esc(r.desc)}: ${short(a.value)} → ${short(b.value)}`;
+}
+function filingTag(r){
+  const d=(r.desc+" "+(r.a?.info||"")).toLowerCase();const fa=r.a?.factor??num(r.a?.value),fb=r.b?.factor??num(r.b?.value);
+  if(/international/.test(d))return"Intl license factor changed in filing";
+  if(/term factor/.test(d))return"Term factor changed in filing";
+  if(/discount matrix/.test(d))return"New discount matrix";
+  if(/surcharge/.test(d)&&/pickup|1ton|4wd/.test(d))return"Pickup surcharge removed";
+  if(/model ?year|my factor/.test(d))return"New model year factors";
+  if(/class/.test(d))return"New driver classes";
+  return"";
 }
 
 function compare(){
-  const A=parse($("a").value),B=parse($("b").value);
-  const mapB=new Map(B.map(r=>[r.key,r]));const used=new Set();const out=[];
-  A.forEach(r=>{const b=mapB.get(r.key);if(b)used.add(r.key);out.push({a:r,b})});
-  B.forEach(r=>{if(!used.has(r.key))out.push({a:null,b:r})});
-  const cols=Math.max(1,...out.map(o=>Math.max(o.a?.nums.length||0,o.b?.nums.length||0)));
-  const hdr=(A.find(r=>r.headers)?.headers)||(B.find(r=>r.headers)?.headers)||[];
-  out.forEach(o=>{
-    o.status=!o.a?"onlyB":!o.b?"onlyA":(o.a.nums.length===o.b.nums.length&&o.a.nums.every((v,i)=>Object.is(v,o.b.nums[i]))&&o.a.dkey===o.b.dkey)?"same":"changed";
+  if(!state.A)fromText("A");if(!state.B)fromText("B");
+  if(!state.A||!state.B){$("summary").innerHTML=`<div class="stat"><span class="k">Waiting</span><span class="v" style="font-size:14px">Add both rate flows to compare</span></div>`;return}
+  const C=compareFlows(state.A,state.B);state.C=C;
+  const diff=C.totalB-C.totalA;
+  const changed=C.veh.reduce((s,v)=>s+v.rows.filter(r=>r.status!=="same"&&!r.noise).length,0);
+  $("summary").innerHTML=`
+    <div class="stat"><span class="k">Premium A → B</span><span class="v">${money(C.totalA)} → ${money(C.totalB)}</span></div>
+    <div class="stat ${Math.abs(diff)>.004?"hot":""}"><span class="k">Difference</span><span class="v">${sdelta(diff)}</span></div>
+    <div class="stat"><span class="k">Steps A / B</span><span class="v">${C.stepsA} / ${C.stepsB}</span></div>
+    <div class="stat ${changed?"hot":""}"><span class="k">Steps that changed</span><span class="v">${changed}</span></div>`;
+  // where it splits
+  const items=[];
+  C.veh.forEach(v=>{
+    if(v.onlyIn){items.push(`<div class="split"><span class="where">Vehicle ${v.no}</span><div class="what">Only in ${v.onlyIn}. The other flow has fewer vehicles.</div><span class="delta">${sdelta((v.premB??0)-(v.premA??0))}</span></div>`);return}
+    const covsSeen=new Set();
+    Object.values(v.firstSplit).forEach(r=>{
+      covsSeen.add(r.section);
+      const cv=v.covs.find(c=>c.cov===r.section);const d=cv?(cv.b??0)-(cv.a??0):null;const tag=filingTag(r);
+      items.push(`<div class="split"><span class="where">Veh ${v.no} · ${esc(r.section)}</span><div class="what">${explain(r)}${tag?`<span class="filing">${esc(tag)}</span>`:""}<small>Rate ${r.rate} · step ${r.a?.step??"—"} in A, ${r.b?.step??"—"} in B</small></div><span class="delta ${d>0?"up":d<0?"down":""}">${cv?sdelta(d):""}</span></div>`);
+    });
+    v.covs.forEach(c=>{if(!covsSeen.has(c.cov)&&Math.abs((c.b??0)-(c.a??0))>.004)items.push(`<div class="split"><span class="where">Veh ${v.no} · ${esc(c.cov)}</span><div class="what">Premium changed but no factor step differs. Check rounding or minimum premium.</div><span class="delta">${sdelta((c.b??0)-(c.a??0))}</span></div>`)});
   });
-  render(out,cols,hdr,A,B);
+  const fa=C.veh.flatMap(v=>v.rows.filter(r=>r.section==="Fees"&&r.status!=="same"));
+  if(fa.length)items.push(`<div class="split"><span class="where">Fees</span><div class="what">${fa.slice(0,3).map(explain).join("; ")}</div><span class="delta"></span></div>`);
+  $("splits").hidden=false;
+  $("splits").innerHTML=`<h2>Where the premiums split</h2>`+(items.length?items.join(""):`<p class="note">No factor step differs between the two flows. If the totals differ, compare the fee lines below.</p>`);
+  renderMatrix(C.matrixA?.key,C.matrixB?.key);
+  const firstVeh=C.veh.findIndex(v=>Object.keys(v.firstSplit).length);state.veh=firstVeh<0?0:firstVeh;
+  const fv=C.veh[state.veh];state.cov=fv?Object.keys(fv.firstSplit)[0]||null:null;
+  renderVehicles();
 }
 
-function render(out,cols,hdr,A,B){
-  const changed=out.filter(o=>o.status!=="same");
-  const tA=totalOf(A),tB=totalOf(B);
-  const s=$("summary");
-  s.innerHTML=`
-    <div class="stat"><span class="k">Rows compared</span><span class="v">${out.length}</span></div>
-    <div class="stat ${changed.length?"hot":""}"><span class="k">Rows that changed</span><span class="v">${changed.length}</span></div>
-    <div class="stat"><span class="k">Total A → B</span><span class="v">${tA!=null&&tB!=null?money(tA)+" → "+money(tB):"—"}</span></div>
-    <div class="stat ${tA!=null&&tB!=null&&tA!==tB?"hot":""}"><span class="k">Difference</span><span class="v">${tA!=null&&tB!=null?(tB-tA>=0?"+":"")+money(tB-tA):"—"}</span></div>`;
-
-  const rs=$("reasons");
-  const items=changed.filter(o=>!/(total|premium|grand)/.test((o.a||o.b).key)).map(o=>{
-    const lab=(o.a||o.b).label;
-    if(o.status==="onlyA")return`<li><b>${esc(lab)}</b> is in A but missing from B.</li>`;
-    if(o.status==="onlyB")return`<li><b>${esc(lab)}</b> appears only in B.</li>`;
-    if(o.a.dkey||o.b.dkey){
-      const da=o.a.dkey,db=o.b.dkey;
-      const diff=SLOTS.filter((_,i)=>(da||"NNNNNNN")[i]!==(db||"NNNNNNN")[i]).map((n,i)=>n).join(", ");
-      return`<li><b>${esc(lab)}</b>: discount key ${da||"?"} (${MATRIX[da]??"?"}) → ${db||"?"} (${MATRIX[db]??"?"}). Changed slot: ${esc(diff||"none")}.<span class="filing">Discount matrix</span></li>`;
-    }
-    const parts=[];const tags=new Set();
-    o.a.nums.forEach((v,i)=>{const w=o.b.nums[i];if(w===undefined||Object.is(v,w))return;
-      const col=hdr[i]?hdr[i]+": ":"";parts.push(`${esc(col)}${fmt(v)} → ${fmt(w)}`);
-      FILING.forEach(f=>{if(f.test(o.a.key,v,w))tags.add(f.txt)})});
-    if(o.b.nums.length>o.a.nums.length)parts.push("extra values in B");
-    return`<li><b>${esc(lab)}</b>: ${parts.join("; ")}${[...tags].map(t=>`<span class="filing">${esc(t)}</span>`).join("")}</li>`;
-  });
-  if(items.length){rs.hidden=false;rs.innerHTML=`<h2>Where the difference comes from</h2><ul>${items.join("")}</ul>`}
-  else{rs.hidden=false;rs.innerHTML=`<h2>Where the difference comes from</h2><p class="note">${out.length?"No factor rows changed. If the totals differ, the gap may come from fees or rounding, or a line was named differently in each paste.":"Nothing parsed yet."}</p>`}
-
-  renderMatrix(A.find(r=>r.dkey)?.dkey,B.find(r=>r.dkey)?.dkey);
-  const only=$("onlyChanged").checked;
-  const rows=out.filter(o=>!only||o.status!=="same");
-  rows.sort((x,y)=>(x.status==="same")-(y.status==="same"));
-  const head=`<thead><tr><th class="lbl">Factor</th><th>Status</th>${Array.from({length:cols},(_,i)=>`<th>${esc(hdr[i]||(cols>1?"Col "+(i+1):"Value"))}</th>`).join("")}<th>Change</th></tr></thead>`;
-  const body=rows.map(o=>{
-    const r=o.a||o.b;let pct="";
-    const cells=Array.from({length:cols},(_,i)=>{
-      const v=o.a?.nums[i],w=o.b?.nums[i];
-      if(o.status==="onlyA")return`<td class="num">${fmt(v)}</td>`;
-      if(o.status==="onlyB")return`<td class="num">${fmt(w)}</td>`;
-      if(v===undefined&&w===undefined)return`<td></td>`;
-      if(Object.is(v,w))return`<td class="num">${fmt(v)}</td>`;
-      const cls=(w??0)>(v??0)?"cell-up":"cell-down";
-      if(!pct&&v&&w!=null)pct=((w/v-1)*100).toFixed(1)+"%";
-      return`<td class="num ${cls}"><span class="old">${fmt(v)}</span>${fmt(w)}</td>`;
-    }).join("");
-    const chip=o.status==="changed"?`<span class="chip c">Changed</span>`:o.status==="same"?`<span class="chip s">Same</span>`:`<span class="chip o">Only in ${o.status==="onlyA"?"A":"B"}</span>`;
-    const lab=esc(r.label)+(r.dkey?` <span class="note">(${o.a?.dkey||"—"} → ${o.b?.dkey||"—"})</span>`:"");
-    return`<tr class="${o.status}"><td class="lbl">${lab}</td><td>${chip}</td>${cells}<td class="num">${pct&&!pct.startsWith("-")?"+"+pct:pct}</td></tr>`;
+function renderVehicles(){
+  const C=state.C;if(!C)return;$("vehbox").hidden=false;
+  $("tabs").innerHTML=C.veh.map((v,i)=>`<button class="tab" role="tab" aria-selected="${i===state.veh}" data-v="${i}">Vehicle ${v.no}${Object.keys(v.firstSplit).length||v.onlyIn?'<span class="dot" title="Has changes"></span>':""}</button>`).join("");
+  $("tabs").querySelectorAll(".tab").forEach(b=>b.onclick=()=>{state.veh=+b.dataset.v;state.cov=null;renderVehicles()});
+  const v=C.veh[state.veh];
+  const secs=["All",...v.sections];
+  $("covs").innerHTML=secs.map(s=>{
+    const c=v.covs.find(x=>x.cov===s);const ch=s!=="All"&&v.rows.some(r=>r.section===s&&r.status!=="same"&&!r.noise);
+    const sel=(state.cov||"All")===s;
+    const p=c?`${money(c.a)} → ${money(c.b)}`:s==="All"?`${money(v.premA)} → ${money(v.premB)}`:`${v.rows.filter(r=>r.section===s).length} steps`;
+    return`<button class="cov ${ch?"ch":""}" aria-pressed="${sel}" data-s="${esc(s)}"><span class="n">${esc(s==="All"?"ALL STEPS":s)}</span><span class="p">${p}</span></button>`;
   }).join("");
-  $("tbl").innerHTML=head+"<tbody>"+(body||`<tr><td class="empty" colspan="${cols+3}">Every row matches.</td></tr>`)+"</tbody>";
+  $("covs").querySelectorAll(".cov").forEach(b=>b.onclick=()=>{state.cov=b.dataset.s==="All"?null:b.dataset.s;renderVehicles()});
+  renderTable();
 }
+function renderTable(){
+  const v=state.C.veh[state.veh];const only=$("onlyChanged").checked,money_=$("moneyOnly").checked,noise=$("showNoise").checked;
+  const firsts=new Set(Object.values(v.firstSplit).map(r=>r.key));
+  const rows=v.rows.filter(r=>(!state.cov||r.section===state.cov)&&(noise||!r.noise)&&(!only||r.status!=="same")&&(!money_||MONEY_MODES.has(r.mode)||/Premium$/.test(r.desc)));
+  const head=`<thead><tr><th class="l">Step A/B</th><th class="l">Cov</th><th class="l">Rate</th><th class="l">Description</th><th>Factor</th><th>Value</th><th>Premium</th><th class="l">Status</th></tr></thead>`;
+  const body=rows.map(r=>{
+    const a=r.a,b=r.b;
+    const cmp=(x,y,f)=>{if(!a)return`<td class="num">${f(y)}</td>`;if(!b)return`<td class="num">${f(x)}</td>`;const sx=f(x),sy=f(y);if(sx===sy)return`<td class="num">${sx}</td>`;const nx=num(x),ny=num(y);const cls=nx!=null&&ny!=null?(ny>nx?"cell-up":"cell-down"):"cell-up";return`<td class="num ${cls}"><span class="old">${sx}</span>${sy}</td>`};
+    const chip=firsts.has(r.key)?`<span class="chip f">First split</span>`:r.status==="changed"?`<span class="chip c">Changed</span>`:r.status==="info"?`<span class="chip o">Detail differs</span>`:r.status==="same"?"":`<span class="chip o">Only in ${r.status==="onlyA"?"A":"B"}</span>`;
+    const infoA=a?.info||"",infoB=b?.info||"";
+    const info=infoA===infoB||!a||!b?`<small>${esc((infoA||infoB).slice(0,180))}</small>`:`<small>A: ${esc(infoA.slice(0,160))}</small><small>B: ${esc(infoB.slice(0,160))}</small>`;
+    return`<tr class="${r.status} ${firsts.has(r.key)?"first":""}"><td class="mono l">${a?.step??"—"} / ${b?.step??"—"}</td><td class="mono l">${esc(r.section)}</td><td class="mono l">${r.rate}</td><td class="desc">${esc(r.desc)}<small>${esc(r.mode)}</small>${info}</td>${cmp(a?.factor,b?.factor,x=>x==null?"":"×"+short(x))}${cmp(a?.value,b?.value,x=>x==null?"—":short(x))}${cmp(a?.prem,b?.prem,x=>x==null?"—":money(x))}<td class="l">${chip}</td></tr>`;
+  }).join("");
+  $("tbl").innerHTML=head+"<tbody>"+(body||`<tr><td class="empty" colspan="8">${only?"No differences in this section. Untick “Only steps that changed” to see every step.":"No steps in this section."}</td></tr>`)+"</tbody>";
+}
+["onlyChanged","moneyOnly","showNoise"].forEach(id=>$(id).onchange=()=>state.C&&renderTable());
+
+/* matrix scan */
 const SHORT=["Home","Prior 1–30","Prior 0","Ren1","Ren2","Multi D≥V","Multi V>D"];
 const ROWS=[["New · no prior",k=>k[1]!=="Y"&&k[2]!=="Y"&&k[3]!=="Y"&&k[4]!=="Y"],["New · prior 1–30",k=>k[1]==="Y"&&k[3]!=="Y"&&k[4]!=="Y"],["New · prior no lapse",k=>k[2]==="Y"&&k[3]!=="Y"&&k[4]!=="Y"],["Ren1 · 6 mo",k=>k[3]==="Y"],["Ren2 · 12 mo",k=>k[4]==="Y"]];
 const KEYROW=["NNNNNNN","NYNNNNN","NNYNNNN","NNNYNNN","NNNNYNN"];
-function colOf(k){return (k[6]==="Y"?4:k[5]==="Y"?2:0)+(k[0]==="Y"?1:0)}
-function rowOf(k){return ROWS.findIndex(r=>r[1](k))}
+const colOf=k=>(k[6]==="Y"?4:k[5]==="Y"?2:0)+(k[0]==="Y"?1:0);
+const rowOf=k=>ROWS.findIndex(r=>r[1](k));
 function renderMatrix(da,db){
-  const sc=$("scan");
-  if(!da&&!db){sc.hidden=true;return}
-  sc.hidden=false;
-  const A=da||"NNNNNNN",B=db||"NNNNNNN";
-  const va=MATRIX[da],vb=MATRIX[db];
+  const sc=$("scan");if(!da&&!db){sc.hidden=true;return}sc.hidden=false;
+  const A=da||"NNNNNNN",B=db||"NNNNNNN";const va=MATRIX[da],vb=MATRIX[db];
   $("scanMeta").textContent=`A ${da||"—"} = ${va??"?"}%  →  B ${db||"—"} = ${vb??"?"}%  ·  Δ ${va!=null&&vb!=null?(vb-va>0?"+":"")+(vb-va)+" pts":"—"}`;
   let s=`<span></span>`+SHORT.map(n=>`<span class="sh">${n}</span>`).join("");
-  [["A",A,"a"],["B",B,"b"]].forEach(([l,k,c])=>{
-    s+=`<span class="rl ${c}">${l} ${k}</span>`;
-    s+=[...k].map((ch,i)=>`<span class="led ${ch==="Y"?"on "+c:""} ${A[i]!==B[i]?"diff":""}">${ch}</span>`).join("");
-  });
+  [["A",A,"a"],["B",B,"b"]].forEach(([l,k,c])=>{s+=`<span class="rl ${c}">${l} ${k}</span>`+[...k].map((ch,i)=>`<span class="led ${ch==="Y"?"on "+c:""} ${A[i]!==B[i]?"diff":""}">${ch}</span>`).join("")});
   const changed=SHORT.filter((_,i)=>A[i]!==B[i]);
-  s+=`<span></span><span class="dl">${changed.length?"Changed slot: "+changed.join(", "):"No slot changed"}</span>`;
-  $("slots").innerHTML=s;
+  s+=`<span></span><span class="dl">${changed.length?"Changed slot: "+changed.join(", "):"No slot changed"}</span>`;$("slots").innerHTML=s;
   const ra=rowOf(A),ca=colOf(A),rb=rowOf(B),cb=colOf(B);
   let g=`<span></span><span class="grp">No multicar</span><span class="grp">Multi drv ≥ veh</span><span class="grp">Multi veh &gt; drv</span><span></span>`+"<span class='ch'>No home</span><span class='ch'>Home</span>".repeat(3);
-  ROWS.forEach((r,ri)=>{
-    g+=`<span class="rh">${r[0]}</span>`;
-    for(let ci=0;ci<6;ci++){
-      const base=KEYROW[ri].split("");if(ci%2)base[0]="Y";if(ci>=4)base[6]="Y";else if(ci>=2)base[5]="Y";
-      const v=MATRIX[base.join("")];
-      const isA=ri===ra&&ci===ca,isB=ri===rb&&ci===cb;
-      const cls=isA&&isB?"ab":isA?"a":isB?"b":"";
-      const tag=isA&&isB?"A·B":isA?"A":isB?"B":"";
-      g+=`<span class="cell ${cls}">${v??"—"}${tag?`<span class="t">${tag}</span>`:""}</span>`;
-    }
-  });
-  $("mgrid").innerHTML=g;
-  sc.classList.remove("run");void sc.offsetWidth;sc.classList.add("run");
+  ROWS.forEach((r,ri)=>{g+=`<span class="rh">${r[0]}</span>`;for(let ci=0;ci<6;ci++){const base=KEYROW[ri].split("");if(ci%2)base[0]="Y";if(ci>=4)base[6]="Y";else if(ci>=2)base[5]="Y";const v=MATRIX[base.join("")];const isA=ri===ra&&ci===ca,isB=ri===rb&&ci===cb;const cls=isA&&isB?"ab":isA?"a":isB?"b":"";const tag=isA&&isB?"A·B":isA?"A":isB?"B":"";g+=`<span class="cell ${cls}">${v??"—"}${tag?`<span class="t">${tag}</span>`:""}</span>`}});
+  $("mgrid").innerHTML=g;sc.classList.remove("run");void sc.offsetWidth;sc.classList.add("run");
 }
-function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 
-const SAMPLE_A=`Factor\tBI\tPD\tPIP\tCOLL\tCOMP
-Base Rate\t182.00\t164.00\t41.00\t210.00\t58.00
-Territory Factor\t1.120\t1.080\t1.100\t1.050\t1.150
-Driver Class Factor\t1.350\t1.300\t1.250\t1.400\t1.200
-Model Year Factor\t1.000\t1.000\t1.000\t1.180\t1.120
-Intl License Factor\t1.050\t1.050\t1.050\t1.050\t1.050
-Policy Term Factor\t6.000\t6.000\t6.000\t6.000\t6.000
-Discount Key\tNNNYNNN
-Discount Factor\t0.880\t0.880\t0.880\t0.880\t0.880
-Policy Fee\t50.00
-Total Premium\t1,148.20`;
-const SAMPLE_B=`Factor\tBI\tPD\tPIP\tCOLL\tCOMP
-Base Rate\t182.00\t164.00\t41.00\t210.00\t58.00
-Territory Factor\t1.120\t1.080\t1.100\t1.050\t1.150
-Driver Class Factor\t1.350\t1.300\t1.250\t1.400\t1.200
-Model Year Factor\t1.000\t1.000\t1.000\t1.180\t1.120
-Intl License Factor\t1.050\t1.050\t1.050\t1.050\t1.050
-Policy Term Factor\t6.000\t6.000\t6.000\t6.000\t6.000
-Discount Key\tNYNNNNN
-Discount Factor\t0.950\t0.950\t0.950\t0.950\t0.950
-Policy Fee\t50.00
-Total Premium\t1,152.20`;
-
-function load(){$("a").value=SAMPLE_A;$("b").value=SAMPLE_B;$("sampleTag").hidden=false;compare()}
-$("run").onclick=()=>{compare()};
-$("swap").onclick=()=>{const t=$("a").value;$("a").value=$("b").value;$("b").value=t;compare()};
-$("clear").onclick=()=>{$("a").value="";$("b").value="";$("sampleTag").hidden=true;compare()};
+/* example: a small two-vehicle flow, made up */
+function sampleTables(variant){
+  const t=[];let step=1;
+  const veh=(vno,terr,my,key,disc,extra)=>{
+    const rows=[["Step","Rate Number","Description","Rate Mode","Flow Info","Value","Premium"]];let prem=0,total=0;
+    const add=(rate,desc,mode,info,val)=>rows.push([String(step++),String(rate),desc,mode,info,String(val),money(total)]);
+    add(1000,"Initialize Adjust Base Factor for Endorsement","EndorsementFactor","Endorsement Factor {1 based on 183 days}",1);
+    add(1030,"Initialize Class Code for this vehicle","SetVariable","'MM45'","MM45");
+    if(extra)add(1036,"reset No License Count in structure","SetStructure","0",0);
+    add(1900,"Territory Code","CoverageTerritory","'TerritoryCode'",57);
+    add(4034,"Get PriorCoverageFactor","LookupRate","PriorCoverage=1, ProgramCode=SNH",0.9);
+    [["BI",58.54,0.72,0.98],["PD",26.35,0.7,0.99]].forEach(([cov,base,tf,cf])=>{
+      add(5010,"Call rating subroutine for "+cov,"CallSub",`CoverageCode='${cov}'=${cov}`,0);
+      let p=base;add(100100,"Lookup up base rate for rates varying by","LookupRate",`CoverageCode=${cov}, ProgramCode=SNH`,base);
+      add(100105,"Update premium for base rate","AddToBase",`{Add to prem: 0} BaseRate=${base}`,base);
+      const t2=cov==="BI"?terr:tf;p*=t2;add(100405,"Apply Territory Factor","MultiplyFactor",`{${t2} applied to prem : ${base}} CoverageCode=${cov}, TerritoryCode=57`,+p.toFixed(6));
+      const q=p;p*=cf;add(100505,"Apply Class Factor","MultiplyFactor",`{${cf} applied to prem : ${+q.toFixed(4)}} CoverageCode=${cov}, DriverClassCode=MM45`,+p.toFixed(6));
+      add(100803,"Lookup MY Factor","StepRateMY2",`VehicleModelYear=2017, CoverageCode=${cov}`,my);
+      p*=my;add(100805,"Apply ModelYear Factor","Multiply",`prem, MYFact=${my}`,+p.toFixed(6));
+      p*=1.05;add(101109,"Get International License Surcharge","MultiplyFactor",`{1.05 applied to prem} ITLicenses=M, CoverageCode=${cov}`,+p.toFixed(6));
+      add(101301,"Lookup discount matrix amount","LookupRate",`Homeowner=${key[0]}, DiscMatrix2=${key.slice(1,3)}, DiscMatrix3=${key.slice(3,5)}, DiscMatrix4=${key.slice(5,7)}`,disc);
+      p*=disc;add(101335,"Apply Discount Factor","Multiply",`prem, Discounts=${disc}`,+p.toFixed(6));
+      total+=+p.toFixed(2);add(5051,cov+" Premium","AddToBase",`{Add to ${cov}Premium: 0} prem=${p}`,p.toFixed(2));
+    });
+    add(9030,"Policy Fee","AdditionalFee","PolicyTerm=1",0);
+    t.push(rows);
+  };
+  if(variant==="A"){veh(1,0.72,1.11,"NNNYNYN",0.74);veh(2,0.72,1.06,"NNNYNYN",0.74)}
+  else{step=1;veh(1,0.72,1.11,"NNNNNYN",0.82,true);veh(2,0.75,1.06,"NNNNNYN",0.82,true)}
+  return t;
+}
+function load(){
+  state.A=buildFlow(sampleTables("A"));state.B=buildFlow(sampleTables("B"));
+  $("infoA").innerHTML="<span>Example flow A</span>"+describe(state.A);$("infoB").innerHTML="<span>Example flow B</span>"+describe(state.B);
+  $("sampleTag").hidden=false;compare();
+}
+$("run").onclick=compare;
+$("swap").onclick=()=>{[state.A,state.B]=[state.B,state.A];const t=$("textA").value;$("textA").value=$("textB").value;$("textB").value=t;const i=$("infoA").innerHTML;$("infoA").innerHTML=$("infoB").innerHTML;$("infoB").innerHTML=i;compare()};
+$("clear").onclick=()=>{state.A=state.B=state.C=null;["A","B"].forEach(s=>{$("text"+s).value="";$("info"+s).innerHTML="";$("file"+s).value=""});$("sampleTag").hidden=true;$("summary").innerHTML="";$("splits").hidden=true;$("scan").hidden=true;$("vehbox").hidden=true};
 $("load").onclick=load;
-$("onlyChanged").onchange=compare;
-["a","b"].forEach(id=>$(id).addEventListener("input",()=>{$("sampleTag").hidden=true}));
 load();
 </script>
 
