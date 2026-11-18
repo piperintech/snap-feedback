@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rating Difference Finder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two paste panes side by side, then a ledger-style diff table with the changed rows on top */
+:root{
+  --bg:#f5f7f9; --surface:#ffffff; --fg:#14202b; --muted:#5b6b78; --line:#d9e1e7;
+  --accent:#0b5d8c; --accent-soft:#e3eff7;
+  --up:#a33a1f; --up-soft:#fbe9e3; --down:#1d7a4b; --down-soft:#e2f3ea; --warn:#8a6400; --warn-soft:#fbf1d6;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f161c; --surface:#16212a; --fg:#e4ecf2; --muted:#93a4b2; --line:#2a3a46;
+  --accent:#5fb0e4; --accent-soft:#16324a;
+  --up:#f0927a; --up-soft:#3a1f18; --down:#6fd3a0; --down-soft:#14301f; --warn:#e8c063; --warn-soft:#33290f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161c; --surface:#16212a; --fg:#e4ecf2; --muted:#93a4b2; --line:#2a3a46;
+  --accent:#5fb0e4; --accent-soft:#16324a;
+  --up:#f0927a; --up-soft:#3a1f18; --down:#6fd3a0; --down-soft:#14301f; --warn:#e8c063; --warn-soft:#33290f; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
+header{display:grid;gap:6px}
+h1{font-size:26px;font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.lede{margin:0;color:var(--muted);max-width:68ch}
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:720px){.panes{grid-template-columns:1fr}}
+.pane{display:grid;gap:8px;min-width:0}
+.pane label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.pane label span.tag{color:var(--accent)}
+textarea{width:100%;min-height:220px;resize:vertical;font-family:var(--mono);font-size:12.5px;line-height:1.55;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg)}
+textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{font:inherit;font-weight:500;border-radius:6px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.note{font-size:13px;color:var(--muted)}
+.sample{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--warn-soft);color:var(--warn)}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:2px}
+.stat .k{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.stat.hot{border-color:var(--up)}
+.reasons{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:grid;gap:8px}
+.reasons h2,.tablebox h2{font-size:15px;margin:0;font-weight:600}
+.reasons ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.reasons li{max-width:90ch}
+.filing{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-left:6px;white-space:nowrap}
+.tablebox{display:grid;gap:10px}
+.tabhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--bg);position:sticky;top:0}
+td.lbl,th.lbl{text-align:left;white-space:normal;min-width:180px}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr.changed td.lbl{box-shadow:inset 3px 0 0 var(--up)}
+tr.onlyA td.lbl,tr.onlyB td.lbl{box-shadow:inset 3px 0 0 var(--warn)}
+tr.same{color:var(--muted)}
+.cell-up{background:var(--up-soft);color:var(--up);font-weight:500}
+.cell-down{background:var(--down-soft);color:var(--down);font-weight:500}
+.chip{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;font-family:var(--sans)}
+.chip.c{background:var(--up-soft);color:var(--up)} .chip.s{background:var(--bg);color:var(--muted)} .chip.o{background:var(--warn-soft);color:var(--warn)}
+.old{color:var(--muted);text-decoration:line-through;margin-right:4px}
+.arrow{color:var(--muted);margin:0 3px}
+.empty{padding:22px;color:var(--muted);text-align:center}
+details{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+summary{cursor:pointer;font-weight:600}
+details p,details li{color:var(--muted);font-size:13.5px;max-width:80ch}
+.scan{--sbg:#0a1620;--sfg:#cfe6f5;--sdim:#4d6a7f;--sline:#1c3446;--ca:#38bdf8;--cb:#f59e0b;--cab:#34d399;
+  background:var(--sbg);color:var(--sfg);border-radius:10px;padding:16px;display:grid;gap:14px;position:relative;overflow:hidden;font-family:var(--mono);
+  background-image:linear-gradient(var(--sline) 1px,transparent 1px),linear-gradient(90deg,var(--sline) 1px,transparent 1px);background-size:22px 22px}
+.scan::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent,rgba(56,189,248,.14) 50%,transparent);height:40%;transform:translateY(-100%);pointer-events:none}
+.scan.run::after{animation:sweep 1.1s ease-out 1}
+@keyframes sweep{to{transform:translateY(260%)}}
+.scan-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline;position:relative;z-index:1}
+.scan h2{font-family:var(--sans);font-size:15px;margin:0;font-weight:600;color:var(--sfg)}
+.scan-meta{font-size:12px;color:var(--sdim)}
+.slots{display:grid;grid-template-columns:64px repeat(7,minmax(0,1fr));gap:6px;align-items:center;position:relative;z-index:1}
+.slots .sh{font-size:10.5px;color:var(--sdim);text-align:center;line-height:1.2;text-transform:uppercase;letter-spacing:.04em}
+.slots .rl{font-size:12px;font-weight:500}
+.slots .rl.a{color:var(--ca)} .slots .rl.b{color:var(--cb)}
+.led{height:30px;border-radius:5px;display:grid;place-items:center;font-size:13px;font-weight:500;border:1px solid var(--sline);background:rgba(255,255,255,.02);color:var(--sdim)}
+.led.on.a{background:rgba(56,189,248,.16);border-color:var(--ca);color:var(--ca);box-shadow:0 0 10px rgba(56,189,248,.35)}
+.led.on.b{background:rgba(245,158,11,.16);border-color:var(--cb);color:var(--cb);box-shadow:0 0 10px rgba(245,158,11,.35)}
+.led.diff{outline:1px dashed #f87171;outline-offset:2px}
+.slots .dl{grid-column:2/-1;font-size:11px;color:#f87171;text-align:center}
+.gridwrap{overflow-x:auto;position:relative;z-index:1}
+.mgrid{display:grid;grid-template-columns:150px repeat(6,minmax(58px,1fr));gap:4px;min-width:560px}
+.mgrid .ch,.mgrid .rh{font-size:10.5px;color:var(--sdim);text-transform:uppercase;letter-spacing:.04em;line-height:1.25}
+.mgrid .ch{text-align:center;align-self:end;padding-bottom:2px}
+.mgrid .rh{align-self:center}
+.mgrid .grp{grid-column:span 2;text-align:center;font-size:10.5px;color:var(--sfg);border-bottom:1px solid var(--sline);padding-bottom:3px;text-transform:uppercase;letter-spacing:.05em}
+.cell{height:38px;border-radius:5px;display:grid;place-items:center;font-size:14px;font-weight:500;background:rgba(255,255,255,.03);border:1px solid var(--sline);color:var(--sdim);position:relative;transition:all .4s}
+.cell.a{border-color:var(--ca);color:var(--ca);background:rgba(56,189,248,.14);box-shadow:0 0 14px rgba(56,189,248,.45)}
+.cell.b{border-color:var(--cb);color:var(--cb);background:rgba(245,158,11,.14);box-shadow:0 0 14px rgba(245,158,11,.45)}
+.cell.ab{border-color:var(--cab);color:var(--cab);background:rgba(52,211,153,.14);box-shadow:0 0 14px rgba(52,211,153,.45)}
+.cell .t{position:absolute;top:2px;right:4px;font-size:9px;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--sdim);position:relative;z-index:1}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.sw.a{background:var(--ca)} .sw.b{background:var(--cb)} .sw.ab{background:var(--cab)}
+@media (max-width:560px){.slots{grid-template-columns:44px repeat(7,minmax(0,1fr));gap:4px}.slots .sh{font-size:9px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.scan.run::after{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Rating Difference Finder</h1>
+    <p class="lede">Paste the rating information from the original quote and from the restarted one. The tool lines up every factor and shows exactly which numbers changed and how much each one moved the premium.</p>
+  </header>
+
+  <div class="panes">
+    <div class="pane">
+      <label for="a">Original rating <span class="tag">A</span></label>
+      <textarea id="a" spellcheck="false" placeholder="Copy the rating table from the policy screen and paste it here"></textarea>
+    </div>
+    <div class="pane">
+      <label for="b">Restarted rating <span class="tag">B</span></label>
+      <textarea id="b" spellcheck="false" placeholder="Paste the second rating table here"></textarea>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button class="primary" id="run">Compare</button>
+    <button id="swap">Swap A and B</button>
+    <button id="clear">Clear</button>
+    <button id="load">Load example</button>
+    <span class="sample" id="sampleTag">Example data loaded</span>
+    <span class="note">Works with tab-separated tables copied from the system or "Factor: value" lines. Rows are matched by their label.</span>
+  </div>
+
+  <section class="summary" id="summary"></section>
+  <section class="reasons" id="reasons" hidden></section>
+
+  <section class="scan" id="scan" hidden>
+    <div class="scan-head">
+      <h2>Discount matrix scan</h2>
+      <span class="scan-meta" id="scanMeta"></span>
+    </div>
+    <div class="slots" id="slots"></div>
+    <div class="gridwrap"><div class="mgrid" id="mgrid"></div></div>
+    <div class="legend"><span><i class="sw a"></i>A · original</span><span><i class="sw b"></i>B · restarted</span><span><i class="sw ab"></i>Same cell</span></div>
+  </section>
+
+  <section class="tablebox">
+    <div class="tabhead">
+      <h2>Line by line</h2>
+      <label class="note"><input type="checkbox" id="onlyChanged" checked> Show only rows that changed</label>
+    </div>
+    <div class="scroll"><table id="tbl"><tbody><tr><td class="empty">Paste two ratings and press Compare.</td></tr></tbody></table></div>
+  </section>
+
+  <details>
+    <summary>Filing changes to keep in mind (new business 11/3/2026, renewals 12/3/2026)</summary>
+    <ul>
+      <li>Six-month policy term factor 6.30 → 6.00</li>
+      <li>International license factor (all other countries) 1.50 → 1.05</li>
+      <li>Pickup truck surcharge removed (factor 1.00)</li>
+      <li>Ren1 / Ren2 allowed lapse cut from 15 days to 5 days. A restart with a 6+ day lapse loses the renewal discount.</li>
+      <li>New discount matrix with more combinations; new 15-year-old and widowed driver classes; new model years 2025–2027; 12 new territories (no factor change).</li>
+    </ul>
+    <p>When a changed factor matches one of these, the tool tags it "Filing change". A 7-letter Y/N discount key is decoded automatically.</p>
+  </details>
+</div>
+
+<script>
+const MATRIX={NNNNNNN:0,YNNNNNN:5,NYNNNNN:5,YYNNNNN:8,NNYNNNN:10,NNNYNNN:12,YNNYNNN:15,YNYNNNN:15,NNNNYNN:18,YNNNYNN:21,NNNNNYN:18,NNNNNNY:27,YNNNNYN:22,YNNNNNY:27,NYNNNYN:20,YYNNNYN:23,NYNNNNY:27,NNNYNYN:26,NNYNNYN:25,YYNNNNY:31,YNYNNNY:36,NNYNNNY:36,NNNYNNY:36,YNYNNYN:30,YNNYNYN:32,YNNYNNY:37,NNNNYYN:38,YNNNYYN:38,NNNNYNY:40,YNNNYNY:40,NYNYNNN:12,YYNYNNN:15,NYNNYNN:18,YYNNYNN:21,NYNYNYN:26,NYNYNNY:36,YYNYNYN:32,YYNYNNY:37,NYNNYYN:38,YYNNYYN:38,NYNNYNY:40,YYNNYNY:40,NNYYNNN:12,YNYYNNN:15,NNYNYNN:18,YNYNYNN:21,NNYYNYN:26,NNYYNNY:36,YNYYNYN:32,YNYYNNY:37,NNYNYYN:38,YNYNYYN:38,NNYNYNY:40,YNYNYNY:40};
+const SLOTS=["Homeowner","Prior 1–30 lapse","Prior no lapse","Ren1","Ren2","Multicar drv≥veh","Multicar veh>drv"];
+const FILING=[
+  {test:(l,a,b)=>/term/.test(l)&&a===6.3&&b===6,txt:"6-month term factor 6.30→6.00"},
+  {test:(l,a,b)=>/(intl|international|foreign|license|lic)/.test(l)&&((a===1.5&&b===1.05)||(a===1.05&&b===1.5)),txt:"Intl license 1.50→1.05"},
+  {test:(l,a,b)=>/(pickup|truck)/.test(l)&&(b===1||a===1),txt:"Pickup surcharge removed"},
+  {test:(l)=>/(disc|ren|lapse|prior)/.test(l),txt:"Check renewal lapse (now 5 days)"}
+];
+
+const $=id=>document.getElementById(id);
+const fmt=n=>{if(n==null||isNaN(n))return"—";const d=Math.abs(n)<10&&n%1!==0?3:2;return n.toLocaleString("en-US",{minimumFractionDigits:n%1===0&&Math.abs(n)<100?0:2,maximumFractionDigits:d})};
+const money=n=>(n<0?"−$":"$")+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const toNum=s=>{const t=String(s).trim().replace(/[$,%]/g,"").replace(/^\((.*)\)$/,"-$1");return t!==""&&!isNaN(t)?parseFloat(t):null};
+const norm=s=>s.toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+
+function parse(text){
+  const rows=[];let headers=null;const seen={};
+  text.split(/\r?\n/).forEach(raw=>{
+    const line=raw.replace(/\s+$/,"");if(!line.trim())return;
+    let cells=line.includes("\t")?line.split("\t"):line.split(/\s{2,}|:\s+|\s*\|\s*/);
+    cells=cells.map(c=>c.trim()).filter(c=>c!=="");
+    if(!cells.length)return;
+    const nums=[],labels=[];let key=null;
+    cells.forEach(c=>{if(/^[YN]{7}$/i.test(c)){key=c.toUpperCase();return}const n=toNum(c);if(n!==null)nums.push(n);else labels.push(c)});
+    if(!nums.length&&!key){if(labels.length>=2)headers=labels.slice(1);else headers=headers;return}
+    let label=labels.join(" ")||("Row "+(rows.length+1));
+    let k=norm(label)||label;seen[k]=(seen[k]||0)+1;if(seen[k]>1)k+=" #"+seen[k];
+    if(key){nums.push(MATRIX[key]??NaN)}
+    rows.push({key:k,label,nums,dkey:key,headers});
+  });
+  return rows;
+}
+
+function totalOf(rows){
+  const r=[...rows].reverse().find(x=>/(total|premium|grand)/.test(x.key));
+  return r?r.nums[r.nums.length-1]:null;
+}
+
+function compare(){
+  const A=parse($("a").value),B=parse($("b").value);
+  const mapB=new Map(B.map(r=>[r.key,r]));const used=new Set();const out=[];
+  A.forEach(r=>{const b=mapB.get(r.key);if(b)used.add(r.key);out.push({a:r,b})});
+  B.forEach(r=>{if(!used.has(r.key))out.push({a:null,b:r})});
+  const cols=Math.max(1,...out.map(o=>Math.max(o.a?.nums.length||0,o.b?.nums.length||0)));
+  const hdr=(A.find(r=>r.headers)?.headers)||(B.find(r=>r.headers)?.headers)||[];
+  out.forEach(o=>{
+    o.status=!o.a?"onlyB":!o.b?"onlyA":(o.a.nums.length===o.b.nums.length&&o.a.nums.every((v,i)=>Object.is(v,o.b.nums[i]))&&o.a.dkey===o.b.dkey)?"same":"changed";
+  });
+  render(out,cols,hdr,A,B);
+}
+
+function render(out,cols,hdr,A,B){
+  const changed=out.filter(o=>o.status!=="same");
+  const tA=totalOf(A),tB=totalOf(B);
+  const s=$("summary");
+  s.innerHTML=`
+    <div class="stat"><span class="k">Rows compared</span><span class="v">${out.length}</span></div>
+    <div class="stat ${changed.length?"hot":""}"><span class="k">Rows that changed</span><span class="v">${changed.length}</span></div>
+    <div class="stat"><span class="k">Total A → B</span><span class="v">${tA!=null&&tB!=null?money(tA)+" → "+money(tB):"—"}</span></div>
+    <div class="stat ${tA!=null&&tB!=null&&tA!==tB?"hot":""}"><span class="k">Difference</span><span class="v">${tA!=null&&tB!=null?(tB-tA>=0?"+":"")+money(tB-tA):"—"}</span></div>`;
+
+  const rs=$("reasons");
+  const items=changed.filter(o=>!/(total|premium|grand)/.test((o.a||o.b).key)).map(o=>{
+    const lab=(o.a||o.b).label;
+    if(o.status==="onlyA")return`<li><b>${esc(lab)}</b> is in A but missing from B.</li>`;
+    if(o.status==="onlyB")return`<li><b>${esc(lab)}</b> appears only in B.</li>`;
+    if(o.a.dkey||o.b.dkey){
+      const da=o.a.dkey,db=o.b.dkey;
+      const diff=SLOTS.filter((_,i)=>(da||"NNNNNNN")[i]!==(db||"NNNNNNN")[i]).map((n,i)=>n).join(", ");
+      return`<li><b>${esc(lab)}</b>: discount key ${da||"?"} (${MATRIX[da]??"?"}) → ${db||"?"} (${MATRIX[db]??"?"}). Changed slot: ${esc(diff||"none")}.<span class="filing">Discount matrix</span></li>`;
+    }
+    const parts=[];const tags=new Set();
+    o.a.nums.forEach((v,i)=>{const w=o.b.nums[i];if(w===undefined||Object.is(v,w))return;
+      const col=hdr[i]?hdr[i]+": ":"";parts.push(`${esc(col)}${fmt(v)} → ${fmt(w)}`);
+      FILING.forEach(f=>{if(f.test(o.a.key,v,w))tags.add(f.txt)})});
+    if(o.b.nums.length>o.a.nums.length)parts.push("extra values in B");
+    return`<li><b>${esc(lab)}</b>: ${parts.join("; ")}${[...tags].map(t=>`<span class="filing">${esc(t)}</span>`).join("")}</li>`;
+  });
+  if(items.length){rs.hidden=false;rs.innerHTML=`<h2>Where the difference comes from</h2><ul>${items.join("")}</ul>`}
+  else{rs.hidden=false;rs.innerHTML=`<h2>Where the difference comes from</h2><p class="note">${out.length?"No factor rows changed. If the totals differ, the gap may come from fees or rounding, or a line was named differently in each paste.":"Nothing parsed yet."}</p>`}
+
+  renderMatrix(A.find(r=>r.dkey)?.dkey,B.find(r=>r.dkey)?.dkey);
+  const only=$("onlyChanged").checked;
+  const rows=out.filter(o=>!only||o.status!=="same");
+  rows.sort((x,y)=>(x.status==="same")-(y.status==="same"));
+  const head=`<thead><tr><th class="lbl">Factor</th><th>Status</th>${Array.from({length:cols},(_,i)=>`<th>${esc(hdr[i]||(cols>1?"Col "+(i+1):"Value"))}</th>`).join("")}<th>Change</th></tr></thead>`;
+  const body=rows.map(o=>{
+    const r=o.a||o.b;let pct="";
+    const cells=Array.from({length:cols},(_,i)=>{
+      const v=o.a?.nums[i],w=o.b?.nums[i];
+      if(o.status==="onlyA")return`<td class="num">${fmt(v)}</td>`;
+      if(o.status==="onlyB")return`<td class="num">${fmt(w)}</td>`;
+      if(v===undefined&&w===undefined)return`<td></td>`;
+      if(Object.is(v,w))return`<td class="num">${fmt(v)}</td>`;
+      const cls=(w??0)>(v??0)?"cell-up":"cell-down";
+      if(!pct&&v&&w!=null)pct=((w/v-1)*100).toFixed(1)+"%";
+      return`<td class="num ${cls}"><span class="old">${fmt(v)}</span>${fmt(w)}</td>`;
+    }).join("");
+    const chip=o.status==="changed"?`<span class="chip c">Changed</span>`:o.status==="same"?`<span class="chip s">Same</span>`:`<span class="chip o">Only in ${o.status==="onlyA"?"A":"B"}</span>`;
+    const lab=esc(r.label)+(r.dkey?` <span class="note">(${o.a?.dkey||"—"} → ${o.b?.dkey||"—"})</span>`:"");
+    return`<tr class="${o.status}"><td class="lbl">${lab}</td><td>${chip}</td>${cells}<td class="num">${pct&&!pct.startsWith("-")?"+"+pct:pct}</td></tr>`;
+  }).join("");
+  $("tbl").innerHTML=head+"<tbody>"+(body||`<tr><td class="empty" colspan="${cols+3}">Every row matches.</td></tr>`)+"</tbody>";
+}
+const SHORT=["Home","Prior 1–30","Prior 0","Ren1","Ren2","Multi D≥V","Multi V>D"];
+const ROWS=[["New · no prior",k=>k[1]!=="Y"&&k[2]!=="Y"&&k[3]!=="Y"&&k[4]!=="Y"],["New · prior 1–30",k=>k[1]==="Y"&&k[3]!=="Y"&&k[4]!=="Y"],["New · prior no lapse",k=>k[2]==="Y"&&k[3]!=="Y"&&k[4]!=="Y"],["Ren1 · 6 mo",k=>k[3]==="Y"],["Ren2 · 12 mo",k=>k[4]==="Y"]];
+const KEYROW=["NNNNNNN","NYNNNNN","NNYNNNN","NNNYNNN","NNNNYNN"];
+function colOf(k){return (k[6]==="Y"?4:k[5]==="Y"?2:0)+(k[0]==="Y"?1:0)}
+function rowOf(k){return ROWS.findIndex(r=>r[1](k))}
+function renderMatrix(da,db){
+  const sc=$("scan");
+  if(!da&&!db){sc.hidden=true;return}
+  sc.hidden=false;
+  const A=da||"NNNNNNN",B=db||"NNNNNNN";
+  const va=MATRIX[da],vb=MATRIX[db];
+  $("scanMeta").textContent=`A ${da||"—"} = ${va??"?"}%  →  B ${db||"—"} = ${vb??"?"}%  ·  Δ ${va!=null&&vb!=null?(vb-va>0?"+":"")+(vb-va)+" pts":"—"}`;
+  let s=`<span></span>`+SHORT.map(n=>`<span class="sh">${n}</span>`).join("");
+  [["A",A,"a"],["B",B,"b"]].forEach(([l,k,c])=>{
+    s+=`<span class="rl ${c}">${l} ${k}</span>`;
+    s+=[...k].map((ch,i)=>`<span class="led ${ch==="Y"?"on "+c:""} ${A[i]!==B[i]?"diff":""}">${ch}</span>`).join("");
+  });
+  const changed=SHORT.filter((_,i)=>A[i]!==B[i]);
+  s+=`<span></span><span class="dl">${changed.length?"Changed slot: "+changed.join(", "):"No slot changed"}</span>`;
+  $("slots").innerHTML=s;
+  const ra=rowOf(A),ca=colOf(A),rb=rowOf(B),cb=colOf(B);
+  let g=`<span></span><span class="grp">No multicar</span><span class="grp">Multi drv ≥ veh</span><span class="grp">Multi veh &gt; drv</span><span></span>`+"<span class='ch'>No home</span><span class='ch'>Home</span>".repeat(3);
+  ROWS.forEach((r,ri)=>{
+    g+=`<span class="rh">${r[0]}</span>`;
+    for(let ci=0;ci<6;ci++){
+      const base=KEYROW[ri].split("");if(ci%2)base[0]="Y";if(ci>=4)base[6]="Y";else if(ci>=2)base[5]="Y";
+      const v=MATRIX[base.join("")];
+      const isA=ri===ra&&ci===ca,isB=ri===rb&&ci===cb;
+      const cls=isA&&isB?"ab":isA?"a":isB?"b":"";
+      const tag=isA&&isB?"A·B":isA?"A":isB?"B":"";
+      g+=`<span class="cell ${cls}">${v??"—"}${tag?`<span class="t">${tag}</span>`:""}</span>`;
+    }
+  });
+  $("mgrid").innerHTML=g;
+  sc.classList.remove("run");void sc.offsetWidth;sc.classList.add("run");
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+const SAMPLE_A=`Factor\tBI\tPD\tPIP\tCOLL\tCOMP
+Base Rate\t182.00\t164.00\t41.00\t210.00\t58.00
+Territory Factor\t1.120\t1.080\t1.100\t1.050\t1.150
+Driver Class Factor\t1.350\t1.300\t1.250\t1.400\t1.200
+Model Year Factor\t1.000\t1.000\t1.000\t1.180\t1.120
+Intl License Factor\t1.050\t1.050\t1.050\t1.050\t1.050
+Policy Term Factor\t6.000\t6.000\t6.000\t6.000\t6.000
+Discount Key\tNNNYNNN
+Discount Factor\t0.880\t0.880\t0.880\t0.880\t0.880
+Policy Fee\t50.00
+Total Premium\t1,148.20`;
+const SAMPLE_B=`Factor\tBI\tPD\tPIP\tCOLL\tCOMP
+Base Rate\t182.00\t164.00\t41.00\t210.00\t58.00
+Territory Factor\t1.120\t1.080\t1.100\t1.050\t1.150
+Driver Class Factor\t1.350\t1.300\t1.250\t1.400\t1.200
+Model Year Factor\t1.000\t1.000\t1.000\t1.180\t1.120
+Intl License Factor\t1.050\t1.050\t1.050\t1.050\t1.050
+Policy Term Factor\t6.000\t6.000\t6.000\t6.000\t6.000
+Discount Key\tNYNNNNN
+Discount Factor\t0.950\t0.950\t0.950\t0.950\t0.950
+Policy Fee\t50.00
+Total Premium\t1,152.20`;
+
+function load(){$("a").value=SAMPLE_A;$("b").value=SAMPLE_B;$("sampleTag").hidden=false;compare()}
+$("run").onclick=()=>{compare()};
+$("swap").onclick=()=>{const t=$("a").value;$("a").value=$("b").value;$("b").value=t;compare()};
+$("clear").onclick=()=>{$("a").value="";$("b").value="";$("sampleTag").hidden=true;compare()};
+$("load").onclick=load;
+$("onlyChanged").onchange=compare;
+["a","b"].forEach(id=>$(id).addEventListener("input",()=>{$("sampleTag").hidden=true}));
+load();
+</script>
+
+</body>
+</html>
